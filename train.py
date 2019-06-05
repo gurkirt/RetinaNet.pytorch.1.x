@@ -57,21 +57,23 @@ parser.add_argument('--anchor_type', default='kmeans', help='kmeans or default')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
-parser.add_argument('--shared_heads', default=0, type=int,help='0 mean no shareding more than 0 means shareing')
+parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
+parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
+parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
 parser.add_argument('--use_bias', default=False, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--input_dim', default=600, type=int, help='Input Size for SSD')
 #  data loading argumnets
-parser.add_argument('--batch_size', default=8, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
 parser.add_argument('--max_iter', default=180000, type=int, help='Number of training iterations')
-parser.add_argument('--lr', '--learning-rate', default=0.005, type=float, help='initial learning rate')
+parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
 parser.add_argument('--milestones', default='120000,160000', type=str, help='Chnage the lr @')
@@ -79,7 +81,7 @@ parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update 
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
 # Freeze batch normlisatio layer or not 
-parser.add_argument('--bn', default=0, type=make_01, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
+parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
 parser.add_argument('--freezeupto', default=2, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Loss function matching threshold
@@ -87,6 +89,7 @@ parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min J
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
+parser.add_argument('--intial_val', default=5000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--val_step', default=15000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
@@ -101,7 +104,7 @@ parser.add_argument('--visdom', default=False, type=str2bool, help='Use visdom f
 parser.add_argument('--vis_port', default=8098, type=int, help='Port for Visdom Server')
 
 # Program arguments
-parser.add_argument('--man_seed', default=1, type=int, help='manualseed for reproduction')
+parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
 parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
 # Use CUDA_VISIBLE_DEVICES=0,1,4,6 to selct GPUs to use
 parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
@@ -162,16 +165,10 @@ def main():
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
 
-    args.exp_name = 'FPN{:d}-{:s}sh{:02d}-{:s}-bs{:02d}-{:s}-{:s}-{:s}-lr{:05d}-bn{:d}{:d}'.format(args.input_dim, 
-                                                          args.anchor_type, 
-                                                          args.shared_heads, 
-                                                          args.dataset,
-                                                          args.batch_size,
-                                                          args.basenet,
-                                                          args.loss_type,
-                                                          args.optim,
-                                                          int(args.lr * 100000),
-                                                          args.bn, args.freezeupto)
+    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}-b{:01d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+                                            args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
+                                            args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
+                                            args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
 
     args.save_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'
@@ -242,7 +239,7 @@ def main():
     else:
         error('Define correct loss type')
 
-    if args.bn == 0:
+    if args.fbn:
         if args.multi_gpu:
             net.module.backbone_net.apply(set_bn_eval)
         else:
@@ -329,7 +326,7 @@ def train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, va
 
 
     train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size, num_workers=args.num_workers,
-                                  shuffle=True, pin_memory=True, collate_fn=custum_collate )
+                                  shuffle=True, pin_memory=True, collate_fn=custum_collate, drop_last=True)
     val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size, num_workers=args.num_workers,
                                  shuffle=False, pin_memory=True, collate_fn=custum_collate)
 
@@ -337,12 +334,14 @@ def train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, va
     torch.cuda.synchronize()
     start = time.perf_counter()
     iteration = args.start_iteration
-
+    eopch = 0
+    num_bpe = len(train_data_loader)/args.batch_size
     while iteration <= args.max_iter:
         for i, (images, gts, _, _) in enumerate(train_data_loader):
             if iteration > args.max_iter:
                 break
             iteration += 1
+            epoch = int(iteration/num_bpe)
             images = images.cuda(0, non_blocking=True)
             gts = [anno.cuda(0, non_blocking=True) for anno in gts]
             # forward
@@ -396,8 +395,8 @@ def train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, va
                     sw.add_scalars('Localisation', {'val': loc_losses.val, 'avg':loc_losses.avg},iteration)
                     sw.add_scalars('Overall', {'val': losses.val, 'avg':losses.avg},iteration)
                     
-                print_line = 'Itration {:06d}/{:06d} loc-loss {:.2f}({:.2f}) cls-loss {:.2f}({:.2f}) ' \
-                             'average-loss {:.2f}({:.2f}) DataTime{:0.2f}({:0.2f}) Timer {:0.2f}({:0.2f})'.format(
+                print_line = 'Itration [{:d}]{:06d}/{:06d} loc-loss {:.2f}({:.2f}) cls-loss {:.2f}({:.2f}) ' \
+                             'average-loss {:.2f}({:.2f}) DataTime{:0.2f}({:0.2f}) Timer {:0.2f}({:0.2f})'.format( epoch,
                               iteration, args.max_iter, loc_losses.val, loc_losses.avg, cls_losses.val,
                               cls_losses.avg, losses.val, losses.avg, 10*data_time.val, 10*data_time.avg, 10*batch_time.val, 10*batch_time.avg)
 
@@ -409,7 +408,7 @@ def train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, va
                     print(print_line)
 
 
-            if (iteration % args.val_step == 0 or iteration == 5000 or iteration == args.max_iter) and iteration>0:
+            if (iteration % args.val_step == 0 or iteration== args.intial_val or iteration == args.max_iter) and iteration>0:
                 torch.cuda.synchronize()
                 tvs = time.perf_counter()
                 print('Saving state, iter:', iteration)
@@ -442,10 +441,9 @@ def train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, va
                         win=val_lot,
                         update='append'
                             )
-                net.train() 
-                # Switch net back to training mode
                 
-                if args.bn == 0:
+                net.train()
+                if args.fbn:
                     if args.multi_gpu:
                         net.module.backbone_net.apply(set_bn_eval)
                     else:

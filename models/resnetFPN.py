@@ -118,11 +118,9 @@ class ResNetFPN(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                # n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                # m.weight.data.normal_(0, math.sqrt(2. / n))
+                torch.nn.init.kaiming_uniform_(m.weight, a=1)
                 if hasattr(m.bias, 'data'):
                     torch.nn.init.constant_(m.bias, 0)
-                #m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()

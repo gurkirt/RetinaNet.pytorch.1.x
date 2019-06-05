@@ -40,10 +40,12 @@ class RetinaNet(nn.Module):
         self.head_size = args.head_size
         self.backbone_net = backbone
         self.shared_heads = args.shared_heads
+        self.num_head_layers = args.num_head_layers
+        assert self.shared_heads<self.num_head_layers, 'number of head layers should be less than shared layers h:'+str(self.num_head_layers)+' sh:'+str(self.shared_heads)
         if self.shared_heads>0:
             self.features_layers = self.make_features(self.shared_heads)
-        self.reg_heads = self.make_head(self.ar * 4, 1-self.shared_heads)
-        self.cls_heads = self.make_head(self.ar * self.num_classes, 1-self.shared_heads)
+        self.reg_heads = self.make_head(self.ar * 4, self.num_head_layers - self.shared_heads)
+        self.cls_heads = self.make_head(self.ar * self.num_classes, self.num_head_layers - self.shared_heads)
         
         if args.loss_type != 'mbox':
             self.prior_prob = 0.01
@@ -93,11 +95,11 @@ class RetinaNet(nn.Module):
 
         return layers
 
-    def make_head(self, out_planes, un_shared_heads):
+    def make_head(self, out_planes, nun_shared_heads):
         layers = []
         use_bias =  self.use_bias
         head_size = self.head_size
-        for _ in range(un_shared_heads):
+        for _ in range(nun_shared_heads):
             layers.append(nn.Conv2d(head_size, head_size, kernel_size=3, stride=1, padding=1, bias=use_bias))
             layers.append(nn.ReLU(True))
 

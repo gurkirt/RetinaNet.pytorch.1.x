@@ -48,7 +48,9 @@ parser.add_argument('--anchor_type', default='kmeans', help='kmeans or default')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
-parser.add_argument('--shared_heads', default=0, type=int,help='0 mean no shareding more than 0 means shareing')
+parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
+parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
+parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
 parser.add_argument('--use_bias', default=False, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
@@ -65,7 +67,7 @@ parser.add_argument('--lr', '--learning-rate', default=0.005, type=float, help='
 parser.add_argument('--eval_iters', default='180000', type=str, help='Chnage the lr @')
 
 # Freeze batch normlisatio layer or not 
-parser.add_argument('--bn', default=0, type=int, help='if 0 freeze or else keep updating bn layers')
+parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
 parser.add_argument('--freezeupto', default=2, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Evaluation hyperparameters
@@ -142,20 +144,12 @@ def main():
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
     
-    args.bn = abs(args.bn) # 0 freeze or else use bn
-    if args.bn>0:
-        args.bn = 1 # update bn layer set the flag to 1
 
-    args.exp_name = 'FPN{:d}-{:s}sh{:02d}-{:s}-bs{:02d}-{:s}-{:s}-{:s}-lr{:05d}-bn{:d}{:d}'.format(args.input_dim, 
-                                                          args.anchor_type, 
-                                                          args.shared_heads, 
-                                                          args.dataset,
-                                                          args.batch_size,
-                                                          args.basenet,
-                                                          args.loss_type,
-                                                          args.optim,
-                                                          int(args.lr * 100000),
-                                                          args.bn, args.freezeupto)
+    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}-b{:01d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+                                        args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
+                                        args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
+                                        args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
+
 
     args.save_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'

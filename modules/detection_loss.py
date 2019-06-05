@@ -150,6 +150,7 @@ class YOLOLoss(nn.Module):
         # binary_preds = binary_preds.reshape(-1)
         # pdb.set_trace()
         # labels_bin[]
+        
         labels_bin[labels_bin>0] = 1
         neg_mask = labels_bin==0
         # pdb.set_trace()

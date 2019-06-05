@@ -53,8 +53,10 @@ parser.add_argument('--anchor_type', default='kmeans', help='kmeans or default')
 parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
-parser.add_argument('--shared_heads', default=1, type=int,help='0 mean no shareding more than 0 means shareing')
-parser.add_argument('--bias_heads', default=0, type=int,help='0 mean no bias in head layears')
+parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
+parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
+parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
+parser.add_argument('--use_bias', default=False, type=str2bool,help='0 mean no bias in head layears')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--input_dim', default=600, type=int, help='Input Size for SSD')
 # Evaluation hyperparameters
