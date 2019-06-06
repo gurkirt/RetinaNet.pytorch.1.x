@@ -26,7 +26,6 @@ class anchorBox(object):
         self.default_scale= [2.4, 2.8, 3, 3.2, 3.4]
 
         # self.default_scale = 2.8
-        
         self.anchor_boxes = len(self.aspect_ratios)*len(self.scale_ratios)
         self.ar = self.anchor_boxes
 
