@@ -16,6 +16,7 @@
     https://github.com/gurkirt/realtime-action-detection
 
     maybe more but that is where I got these from
+    
     Please don't remove above credits and give star to these repos
     Licensed under The MIT License [see LICENSE for details]
     
@@ -81,7 +82,7 @@ parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update 
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
 # Freeze batch normlisatio layer or not 
-parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
+parser.add_argument('--fbn', default=True, type=str2bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
 parser.add_argument('--freezeupto', default=2, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Loss function matching threshold

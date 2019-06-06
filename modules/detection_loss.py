@@ -229,13 +229,15 @@ class FocalLoss(nn.Module):
         mask = labels_bin > -1 # Get mask to remove ignore examples
         object_preds = object_preds[mask].reshape(-1,num_classes) # Remove Ignore preds
         labels = labels[mask].reshape(-1,num_classes) # Remove Ignore labels
-        with torch.no_grad():
-            alpha_factor = self.alpha*labels + (1-self.alpha)*(1-labels)
-            focal_weight = ( 1.0 - object_preds ) * labels + object_preds * ( 1 - labels )
-            focal_weight = alpha_factor * focal_weight ** self.gamma
+        # with torch.no_grad():
+        alpha_factor = self.alpha*labels + (1-self.alpha)*(1-labels)
+        focal_weight = ( 1.0 - object_preds ) * labels + object_preds * ( 1 - labels )
+        focal_weight = alpha_factor * (focal_weight ** self.gamma)
         
-        classification_loss = F.binary_cross_entropy(object_preds, labels, weight=focal_weight, reduction='sum') / num_pos
-
+        classification_loss = F.binary_cross_entropy(object_preds, labels, reduction='none')
+        # pdb.set_trace()
+        classification_loss = (classification_loss* focal_weight).sum() / num_pos
+        
         # labels_bin[labels_bin>0] = 1
         # binary_preds = binary_preds[labels_bin>-1]
         # labels_bin = labels_bin[labels_bin>-1]
