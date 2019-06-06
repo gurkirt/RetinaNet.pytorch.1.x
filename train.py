@@ -61,7 +61,7 @@ parser.add_argument('--basenet', default='resnet50', help='pretrained base model
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
 parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
 parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
-parser.add_argument('--use_bias', default=False, type=str2bool,help='0 mean no bias in head layears')
+parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
@@ -166,7 +166,7 @@ def main():
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
 
-    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}-b{:01d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
                                             args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
                                             args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
                                             args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
@@ -204,7 +204,7 @@ def main():
     print('\nLoading Datasets')
     # ,
     train_transform = transforms.Compose([
-                        # transforms.ColorJitter(brightness=0.10, contrast=0.10, saturation=0.10, hue=0.05),
+                        #transforms.ColorJitter(brightness=0.10, contrast=0.10, saturation=0.10, hue=0.05),
                         transforms.Resize((args.input_dim, args.input_dim)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])

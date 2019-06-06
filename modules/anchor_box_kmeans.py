@@ -36,24 +36,12 @@ anchor_boxes_kmeaned['coco'] = np.asarray( [[0.0000, 0.0000, 0.0303, 0.0847],
                                             [0.0000, 0.0000, 0.8336, 0.8634],
                                             [0.0000, 0.0000, 0.7504, 0.4907]])
 
-# anchor_boxes_kmeaned['coco'] = np.asarray( [[0.0000, 0.0000, 0.0260, 0.0750],
-#                                             [0.0000, 0.0000, 0.0161, 0.0269],
-#                                             [0.0000, 0.0000, 0.0547, 0.0335],
-#                                             [0.0000, 0.0000, 0.0520, 0.1613],
-#                                             [0.0000, 0.0000, 0.0657, 0.0783],
-#                                             [0.0000, 0.0000, 0.1458, 0.0656],
-#                                             [0.0000, 0.0000, 0.1088, 0.3015],
-#                                             [0.0000, 0.0000, 0.1285, 0.1558],
-#                                             [0.0000, 0.0000, 0.2564, 0.1516],
-#                                             [0.0000, 0.0000, 0.1795, 0.5149],
-#                                             [0.0000, 0.0000, 0.3053, 0.3588],
-#                                             [0.0000, 0.0000, 0.5193, 0.2144],
-#                                             [0.0000, 0.0000, 0.3859, 0.7187],
-#                                             [0.0000, 0.0000, 0.8255, 0.8502],
-#                                             [0.0000, 0.0000, 0.7242, 0.4552]])
 
 feature_sizes = dict()
-feature_sizes['600'] = [75, 38, 19, 10, 5]
+
+def get_feature_sizes(input_dim, num_fms=5):
+    return [(input_dim/pow(2.,i+3)).ceil() for i in range(num_fms)]
+    # feature_sizes['600'] = [75, 38, 19, 10, 5]
 
 class anchorBox(object):
     """
@@ -68,7 +56,7 @@ class anchorBox(object):
         self.anchor_set = dataset
         self.ar = default_ratios
         self.base_set = anchor_boxes_kmeaned[dataset]
-        self.feature_size = feature_sizes[str(input_dim)]
+        self.feature_size = get_feature_sizes(input_dim)
 
     def forward(self):
         anchors = []
