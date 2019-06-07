@@ -1,4 +1,4 @@
-import torch
+import torch, math
 from math import sqrt as sqrt
 from itertools import product as product
 import numpy as np
@@ -40,9 +40,9 @@ anchor_boxes_kmeaned['coco'] = np.asarray( [[0.0000, 0.0000, 0.0303, 0.0847],
 feature_sizes = dict()
 
 def get_feature_sizes(input_dim, num_fms=5):
-    return [(input_dim/pow(2.,i+3)).ceil() for i in range(num_fms)]
+    return [math.ceil(input_dim/pow(2.,i+3)) for i in range(num_fms)]
     # feature_sizes['600'] = [75, 38, 19, 10, 5]
-
+# [(600/pow(2.,i+3)).ceil() for i in range(5)]
 class anchorBox(object):
     """
     Compute anchorbox coordinates in center-offset form for each source

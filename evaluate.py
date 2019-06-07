@@ -1,3 +1,4 @@
+
 """ 
     
     Adapted from:
@@ -8,8 +9,7 @@
     https://github.com/gurkirt/realtime-action-detection
 
     Please don't remove above credits and give star to these repos
-    Licensed under The MIT License [see LICENSE for details]
-    
+    Licensed under The MIT License [see LICENSE for details]    
 
 """
 
@@ -51,7 +51,7 @@ parser.add_argument('--basenet', default='resnet50', help='pretrained base model
 parser.add_argument('--multi_scale', default=False, type=str2bool,help='perfrom multiscale training')
 parser.add_argument('--shared_heads', default=0, type=int,help='4 head layers')
 parser.add_argument('--num_head_layers', default=4, type=int,help='0 mean no shareding more than 0 means shareing')
-parser.add_argument('--use_bias', default=False, type=str2bool,help='0 mean no bias in head layears')
+parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bias in head layears')
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
@@ -144,12 +144,10 @@ def main():
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
     
-
-    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}-b{:01d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
-                                        args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
-                                        args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
-                                        args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
-
+    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+                                            args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
+                                            args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
+                                            args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
 
     args.save_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'

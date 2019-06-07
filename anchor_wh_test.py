@@ -35,7 +35,8 @@ def my_anchors():
 
 
 
-sizes   = [32,]
+sizes   = [32,64,128,256,512]
+grid_size = [75, 38, 19, 10, 5]
 strides = [8,]
 ratios  = np.array([0.5, 1, 2])
 scales  = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
@@ -67,7 +68,7 @@ def generate_anchors(base_size=32):
 
     print('keras', anchors)
 
-def new_anchors(sizes, ratios):
+def new_anchors():
     anchor_wh = []
     for s1 in sizes:
         size_anchors = []
