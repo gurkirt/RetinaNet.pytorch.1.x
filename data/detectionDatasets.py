@@ -23,7 +23,7 @@ import torch
 import pdb, time
 import torch.utils.data as data
 import pickle
-
+from .transforms import get_image_list_resized
 import torch.nn.functional as F
 import numpy as np
 from PIL import ImageFile
@@ -107,37 +107,28 @@ class Detection(data.Dataset):
 
         img_name = '{:s}{:s}.jpg'.format(self.root, img_id)
         # print(img_name)
-        
         # t0 = time.perf_counter()
         img = Image.open(img_name).convert('RGB')
         # pdb.set_trace()
-        width, height = img.size
-        wh = [width, height]
-
         # print(img.size)
         if self.train and np.random.random() < 0.5:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
             w = boxes[:, 2] - boxes[:, 0]
             boxes[:, 0] = 1 - boxes[:, 2] # boxes should be in x1 y1 x2 y2 [0,1] format 
             boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
-            
-            # tp = 1.0 - boxes[:, 2].copy()
-            # print(boxes)
-            # print(boxes)
-            # img.show()
-            # draw = ImageDraw.Draw(img)
-            # bb = boxes[0,:].copy()
-            # bb[0] *= width
-            # bb[1] *= height
-            # bb[2] *= width
-            # bb[3] *= height
-            # draw.rectangle(bb)
-            # img.show()
-            # pdb.set_trace()
         
+
+        print(img.size)
         img = self.transform(img)
+        _, width, height = img.shape
+        print(img.shape)
+        wh = [width, height]
+        boxes[:, 0] *= width # width x1
+        boxes[:, 2] *= width # width x2
+        boxes[:, 1] *= height # height y1
+        boxes[:, 3] *= height # height y2
+
         targets = np.hstack((boxes, np.expand_dims(labels, axis=1)))
-        # print(targets)
         return img, targets, index, wh
 
 def custum_collate(batch):
@@ -152,8 +143,8 @@ def custum_collate(batch):
         targets.append(torch.FloatTensor(sample[1]))
         image_ids.append(sample[2])
         whs.append(sample[3])
-    images = torch.stack(images, 0)
+    
+    images = get_image_list_resized(images)
 
-    # images, ground_truths, _ , _, num_mt, img_indexs
     return images, targets, image_ids, whs
 

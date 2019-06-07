@@ -43,6 +43,7 @@ from modules.box_utils import decode, nms
 from modules import  AverageMeter
 from data import Detection, BaseTransform, custum_collate
 from torchvision import transforms
+from data.transforms import Resize
 # from models.fpn_heads import build_fpn_unshared
 from models.retinanet_shared_heads import build_retinanet_shared_heads
 
@@ -65,7 +66,8 @@ parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bi
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
-parser.add_argument('--input_dim', default=600, type=int, help='Input Size for SSD')
+parser.add_argument('--min_size', default=600, type=int, help='Input Size for SSD')
+parser.add_argument('--max_size', default=1000, type=int, help='Input Size for SSD')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
@@ -166,8 +168,8 @@ def main():
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
 
-    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
-                                            args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
+    args.exp_name = 'FPN{:d}x{:d}-{:01d}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+                                            args.min_size, args.max_size, int(args.multi_scale), args.dataset, args.basenet,
                                             args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
                                             args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
 
@@ -181,15 +183,7 @@ def main():
     utils.copy_source(source_dir)
 
     anchors = 'None'
-    with torch.no_grad():
-        if args.anchor_type == 'kmeans':
-            anchorbox = kanchorBoxes(input_dim=args.input_dim, dataset=args.dataset)
-        else:
-            anchorbox = anchorBox(args.anchor_type, input_dim=args.input_dim, dataset=args.dataset)
-        anchors = anchorbox.forward()
-        args.ar = anchorbox.ar
-    
-    args.num_anchors = anchors.size(0)
+    args.ar = 9
 
     if args.dataset == 'coco':
         args.train_sets = ['train2017']
@@ -205,14 +199,14 @@ def main():
     # ,
     train_transform = transforms.Compose([
                         #transforms.ColorJitter(brightness=0.10, contrast=0.10, saturation=0.10, hue=0.05),
-                        transforms.Resize((args.input_dim, args.input_dim)),
+                        Resize((args.min_size, args.max_size)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
     train_dataset = Detection(args, train=True, image_sets=args.train_sets, transform=train_transform)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
-                        transforms.Resize((args.input_dim, args.input_dim)),
+                        Resize((args.min_size, args.max_size)),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     val_dataset = Detection(args, train=False, image_sets=args.val_sets, transform=val_transform, full_test=False)
@@ -230,16 +224,6 @@ def main():
         print('\nLets do dataparallel\n')
         net = torch.nn.DataParallel(net)
 
-    
-    if args.loss_type == 'mbox':
-        criterion = MultiBoxLoss(args.positive_threshold)
-    elif args.loss_type == 'yolo':
-        criterion = YOLOLoss(args.positive_threshold, args.negative_threshold)
-    elif args.loss_type == 'focal':
-        criterion = FocalLoss(args.positive_threshold, args.negative_threshold)
-    else:
-        error('Define correct loss type')
-
     if args.fbn:
         if args.multi_gpu:
             net.module.backbone_net.apply(set_bn_eval)
@@ -248,10 +232,10 @@ def main():
     
     optimizer, scheduler, solver_print_str = get_optim(args, net)
 
-    train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, val_dataset, solver_print_str)
+    train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset, solver_print_str)
 
 
-def train(args, net, anchors, optimizer, criterion, scheduler, train_dataset, val_dataset, solver_print_str):
+def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset, solver_print_str):
     
     args.start_iteration = 0
     if args.resume>100:

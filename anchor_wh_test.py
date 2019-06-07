@@ -42,11 +42,17 @@ ratios  = np.array([0.5, 1, 2])
 scales  = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
 
 
-def generate_anchors(base_size=32):
+def generate_anchors(base_size=16, ratios=None, scales=None):
     """
     Generate anchor (reference) windows by enumerating aspect ratios X
     scales w.r.t. a reference window.
     """
+
+    if ratios is None:
+        ratios = AnchorParameters.default.ratios
+
+    if scales is None:
+        scales = AnchorParameters.default.scales
 
     num_anchors = len(ratios) * len(scales)
 
@@ -60,13 +66,14 @@ def generate_anchors(base_size=32):
     areas = anchors[:, 2] * anchors[:, 3]
 
     # correct for ratios
-    # print(areas)
-    pdb.set_trace()
-
     anchors[:, 2] = np.sqrt(areas / np.repeat(ratios, len(scales)))
     anchors[:, 3] = anchors[:, 2] * np.repeat(ratios, len(scales))
 
-    print('keras', anchors)
+    # transform from (x_ctr, y_ctr, w, h) -> (x1, y1, x2, y2)
+    anchors[:, 0::2] -= np.tile(anchors[:, 2] * 0.5, (2, 1)).T
+    anchors[:, 1::2] -= np.tile(anchors[:, 3] * 0.5, (2, 1)).T
+
+    return anchors
 
 def new_anchors():
     anchor_wh = []

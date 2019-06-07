@@ -51,9 +51,20 @@ class RetinaNet(nn.Module):
             self.prior_prob = 0.01
             bias_value = -math.log((1 - self.prior_prob ) / self.prior_prob )
             nn.init.constant_(self.cls_heads[-1].bias, bias_value)
+        
+        self.anchor_generator = 
+
+        if args.loss_type == 'mbox':
+            self.criterion = MultiBoxLoss(args.positive_threshold)
+        elif args.loss_type == 'yolo':
+            self.criterion = YOLOLoss(args.positive_threshold, args.negative_threshold)
+        elif args.loss_type == 'focal':
+            self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold)
+        else:
+            error('Define correct loss type')
 
 
-    def forward(self, x, get_features=False):
+    def forward(self, x, return_loss=True, get_features=False):
         sources = self.backbone_net(x)
         features = list()
         # pdb.set_trace()
@@ -71,9 +82,12 @@ class RetinaNet(nn.Module):
         loc = torch.cat([o.view(o.size(0), -1) for o in loc], 1)
         conf = torch.cat([o.view(o.size(0), -1) for o in conf], 1)
         
+        flat_loc = loc.view(loc.size(0), -1, 4)
+        flat_conf = conf.view(conf.size(0), -1, self.num_classes)
         if get_features:
-            return loc.view(loc.size(0), -1, 4), conf.view(conf.size(0), -1, self.num_classes), features
-        else:
+            return  flat_loc, flat_conf, features
+        elif return_loss:
+            
             return loc.view(loc.size(0), -1, 4), conf.view(conf.size(0), -1, self.num_classes)
 
 
