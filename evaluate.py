@@ -57,14 +57,14 @@ parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
 parser.add_argument('--input_dim', default=600, type=int, help='Input Size for FPN')
 #  data loading argumnets
-parser.add_argument('--batch_size', default=8, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
 parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--lr', '--learning-rate', default=0.005, type=float, help='initial learning rate')
-parser.add_argument('--eval_iters', default='180000', type=str, help='Chnage the lr @')
+parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
+parser.add_argument('--eval_iters', default='90000', type=str, help='Chnage the lr @')
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
@@ -271,7 +271,7 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
             height, width = images.size(2), images.size(3)
 
             images = images.cuda(0, non_blocking=True)
-            loc_data, conf_data = net(images)
+            loc_data, conf_data, features = net(images, get_features=True)
 
             conf_scores_all = activation(conf_data).clone()
             
@@ -295,14 +295,9 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
                 for cl_ind in range(1, num_classes):
                     # pdb.set_trace()
                     scores = conf_scores[:, cl_ind].squeeze()
-                    
-                    scoresth, _ = torch.sort(scores, descending=True)
-                    # pdb.set_trace()
-                    max_scoresth = scoresth[2000]
-                    min_scoresth = 0.25
-                    # print(scoresth, args.conf_thresh)
-                    c_mask = scores.gt(min(max(max_scoresth, args.conf_thresh), min_scoresth))  # greater than minmum threshold
-
+                    # scoresth, _ = torch.sort(scores, descending=True)
+                    c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
+                    # c_mask = scores.gt(min(max(max_scoresth, args.conf_thresh), min_scoresth))  # greater than minmum threshold
                     scores = scores[c_mask].squeeze()
                     # print('scores size',scores.size())
                     if scores.dim() == 0:
