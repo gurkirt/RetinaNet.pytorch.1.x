@@ -1,14 +1,18 @@
 
 
-""" FPN network Classes
+""" 
+
+FPN network Classes
 
 Author: Gurkirt Singh
 Inspired from https://github.com/kuangliu/pytorch-retinanet and
 https://github.com/gurkirt/realtime-action-detection
 
 """
-
+from modules.anchor_box_retinanet import anchorBox
+from modules.detection_loss import MultiBoxLoss, YOLOLoss, FocalLoss
 from models.backbone_models import backbone_models
+from modules.box_utils import decode
 import torch, math, pdb, math
 import torch.nn as nn
 
@@ -34,14 +38,19 @@ class RetinaNet(nn.Module):
         super(RetinaNet, self).__init__()
 
         self.num_classes = args.num_classes
-        # TODO: implement __call__ in anchorBox
-        self.ar = args.ar
+        # TODO: implement __call__ in 
+        
+        self.anchors = anchorBox()
+        self.ar = self.anchors.ar
+        args.ar = self.ar
         self.use_bias = args.use_bias
         self.head_size = args.head_size
         self.backbone_net = backbone
         self.shared_heads = args.shared_heads
         self.num_head_layers = args.num_head_layers
+        
         assert self.shared_heads<self.num_head_layers, 'number of head layers should be less than shared layers h:'+str(self.num_head_layers)+' sh:'+str(self.shared_heads)
+        
         if self.shared_heads>0:
             self.features_layers = self.make_features(self.shared_heads)
         self.reg_heads = self.make_head(self.ar * 4, self.num_head_layers - self.shared_heads)
@@ -51,21 +60,19 @@ class RetinaNet(nn.Module):
             self.prior_prob = 0.01
             bias_value = -math.log((1 - self.prior_prob ) / self.prior_prob )
             nn.init.constant_(self.cls_heads[-1].bias, bias_value)
-        
-        self.anchor_generator = 
-
-        if args.loss_type == 'mbox':
-            self.criterion = MultiBoxLoss(args.positive_threshold)
-        elif args.loss_type == 'yolo':
-            self.criterion = YOLOLoss(args.positive_threshold, args.negative_threshold)
-        elif args.loss_type == 'focal':
-            self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold)
-        else:
-            error('Define correct loss type')
+        if not hasattr(args, 'eval_iters'): # eval_iters only in test case
+            if args.loss_type == 'mbox':
+                self.criterion = MultiBoxLoss(args.positive_threshold)
+            elif args.loss_type == 'yolo':
+                self.criterion = YOLOLoss(args.positive_threshold, args.negative_threshold)
+            elif args.loss_type == 'focal':
+                self.criterion = FocalLoss(args.positive_threshold, args.negative_threshold)
+            else:
+                error('Define correct loss type')
 
 
-    def forward(self, x, return_loss=True, get_features=False):
-        sources = self.backbone_net(x)
+    def forward(self, images, gts=None, counts=None,get_features=False):
+        sources = self.backbone_net(images)
         features = list()
         # pdb.set_trace()
         if self.shared_heads>0:
@@ -73,8 +80,13 @@ class RetinaNet(nn.Module):
                 features.append(self.features_layers(x))
         else:
             features = sources
+        
+        grid_sizes = [feature_map.shape[-2:] for feature_map in features]
+        ancohor_boxes = self.anchors(grid_sizes)
+        
         loc = list()
         conf = list()
+        
         for x in features:
             loc.append(self.reg_heads(x).permute(0, 2, 3, 1).contiguous())
             conf.append(self.cls_heads(x).permute(0, 2, 3, 1).contiguous())
@@ -84,11 +96,13 @@ class RetinaNet(nn.Module):
         
         flat_loc = loc.view(loc.size(0), -1, 4)
         flat_conf = conf.view(conf.size(0), -1, self.num_classes)
-        if get_features:
-            return  flat_loc, flat_conf, features
-        elif return_loss:
-            
-            return loc.view(loc.size(0), -1, 4), conf.view(conf.size(0), -1, self.num_classes)
+        # pdb.set_trace()
+        if get_features: # testing mode with feature return
+            return  torch.stack([decode(flat_loc[b], ancohor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf, features
+        elif gts is not None: # training mode 
+            return self.criterion(flat_conf, flat_loc, gts, counts, ancohor_boxes)
+        else: # otherwise testing mode 
+            return  torch.stack([decode(flat_loc[b], ancohor_boxes) for b in range(flat_loc.shape[0])], 0), flat_conf
 
 
     def make_features(self,  shared_heads):

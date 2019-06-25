@@ -37,6 +37,7 @@ from models.retinanet_shared_heads import build_retinanet_shared_heads
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from torchvision import transforms
+from data.transforms import Resize
 
 def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
@@ -55,7 +56,8 @@ parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bi
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
-parser.add_argument('--input_dim', default=600, type=int, help='Input Size for FPN')
+parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
+parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
@@ -108,7 +110,7 @@ if username == 'gurkirt':
         args.save_root = '/mnt/mars-gamma/'
         args.vis_port = 8097
     elif hostname in ['sun','jupiter']:
-        args.data_root = '/mnt/mars-fast/datasets/'
+        args.data_root = '/mnt/mercury-fast/datasets/'
         args.save_root = '/mnt/mars-gamma/'
         if hostname in ['sun']:
             args.vis_port = 8096
@@ -144,31 +146,14 @@ def main():
     args.dataset = args.dataset.lower()
     args.basenet = args.basenet.lower()
     
-    args.exp_name = 'FPN{:d}-{:01d}-{:s}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
-                                            args.input_dim, int(args.multi_scale), args.anchor_type, args.dataset, args.basenet,
+    args.exp_name = 'FPN{:d}x{:d}-{:01d}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
+                                            args.min_size, args.max_size, int(args.multi_scale), args.dataset, args.basenet,
                                             args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
                                             args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
 
     args.save_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'
 
-    if not os.path.isdir(args.save_root): # if save directory doesn't exist create it
-        os.makedirs(args.save_root)
-
-    source_dir = args.save_root+'/source/' # where to save the source
-    utils.copy_source(source_dir)
-
-    anchors = 'None'
-    with torch.no_grad():
-        if args.anchor_type == 'kmeans':
-            anchorbox = kanchorBoxes(input_dim=args.input_dim, dataset=args.dataset)
-        else:
-            anchorbox = anchorBox(args.anchor_type, input_dim=args.input_dim, dataset=args.dataset)
-        anchors = anchorbox.forward()
-        args.ar = anchorbox.ar
-    
-    args.num_anchors = anchors.size(0)
-    anchors = anchors.cuda(0, non_blocking=True)
     if args.dataset == 'coco':
         args.train_sets = ['train2017']
         args.val_sets = ['val2017']
@@ -179,7 +164,7 @@ def main():
     args.means =[0.485, 0.456, 0.406]
     args.stds = [0.229, 0.224, 0.225]
     val_transform = transforms.Compose([ 
-                        transforms.Resize((args.input_dim, args.input_dim)),
+                        Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     val_dataset = Detection(args, train=False, image_sets=args.val_sets, 
@@ -188,9 +173,8 @@ def main():
     args.data_dir = val_dataset.root
     args.num_classes = len(val_dataset.classes) + 1
     args.classes = val_dataset.classes
-
     args.head_size = 256
-
+    
     net = build_retinanet_shared_heads(args).cuda()
 
     if args.multi_gpu>0:
@@ -219,9 +203,9 @@ def main():
         log_file.write('Testing net \n')
         net.eval() # switch net to evaluation mode
         if args.dataset != 'coco':
-            mAP, ap_all, ap_strs , det_boxes = validate(args, net, anchors, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
+            mAP, ap_all, ap_strs , det_boxes = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
         else:
-            mAP, ap_all, ap_strs , det_boxes = validate_coco(args, net, anchors, val_data_loader, val_dataset, iteration, log_file, iou_thresh=args.iou_thresh)
+            mAP, ap_all, ap_strs , det_boxes = validate_coco(args, net, val_data_loader, val_dataset, iteration, log_file, iou_thresh=args.iou_thresh)
 
         for ap_str in ap_strs:
             print(ap_str)
@@ -235,7 +219,7 @@ def main():
         log_file.close()
 
 
-def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_num, resFile_txt, iou_thresh=0.5):
+def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFile_txt, iou_thresh=0.5):
     """Test a FPN network on an image database."""
     print('Validating at ', iteration_num)
 
@@ -262,7 +246,7 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
     all_ids = val_dataset.ids
 
     with torch.no_grad():
-        for val_itr, (images, targets, img_indexs, wh) in enumerate(val_data_loader):
+        for val_itr, (images, targets, batch_counts, img_indexs, wh) in enumerate(val_data_loader):
 
             torch.cuda.synchronize()
             t1 = time.perf_counter()
@@ -271,7 +255,7 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
             height, width = images.size(2), images.size(3)
 
             images = images.cuda(0, non_blocking=True)
-            loc_data, conf_data, features = net(images, get_features=True)
+            decoded_boxes, conf_data = net(images)
 
             conf_scores_all = activation(conf_data).clone()
             
@@ -279,17 +263,16 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
                 torch.cuda.synchronize()
                 tf = time.perf_counter()
                 print('Forward Time {:0.3f}'.format(tf-t1))
+            
             for b in range(batch_size):
                 
                 coco_image_id = int(all_ids[img_indexs[b]][1][8:])
                 width, height = wh[b][0], wh[b][1]
-                gt = targets[b].numpy()
-                gt[:,0] *= width
-                gt[:,2] *= width
-                gt[:,1] *= height
-                gt[:,3] *= height
+                o_width, o_height = wh[b][2], wh[b][3]
+                # print(wh[b])
+                gt = targets[b, :batch_counts[b]].numpy()
                 gt_boxes.append(gt)
-                decoded_boxes = decode(loc_data[b], anchors, [0.1, 0.2]).clone()
+                decoded_boxes_b = decoded_boxes[b]
                 conf_scores = conf_scores_all[b].clone()
                 #Apply nms per class and obtain the results
                 for cl_ind in range(1, num_classes):
@@ -304,7 +287,7 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
                         # print(len(''), ' dim ==0 ')
                         det_boxes[cl_ind - 1].append(np.asarray([]))
                         continue
-                    boxes = decoded_boxes.clone()
+                    boxes = decoded_boxes_b.clone()
                     l_mask = c_mask.unsqueeze(1).expand_as(boxes)
                     boxes = boxes[l_mask].view(-1, 4)
                     # idx of highest scoring and non-overlapping boxes per class
@@ -314,11 +297,7 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
                     scores = scores[:pick]
                     boxes = boxes[ids[:counts]].cpu().numpy()
                     boxes = boxes[:pick, :]
-                    # print('boxes sahpe',boxes.shape)
-                    boxes[:,0] *= width
-                    boxes[:,2] *= width
-                    boxes[:,1] *= height
-                    boxes[:,3] *= height
+
                     cls_id = cl_ind-1
                     if len(idlist)>0:
                         cls_id = idlist[cl_ind-1]
@@ -328,7 +307,9 @@ def validate_coco(args, net, anchors,  val_data_loader, val_dataset, iteration_n
                         boxes[ik, 2] = min(width, boxes[ik, 2])
                         boxes[ik, 1] = max(0, boxes[ik, 1])
                         boxes[ik, 3] = min(height, boxes[ik, 3])
-                        box_ = [round(boxes[ik, 0], 1), round(boxes[ik, 1],1), round(boxes[ik, 2],1), round(boxes[ik, 3], 1)]
+                        # box_ = [round(boxes[ik, 0], 1), round(boxes[ik, 1],1), round(boxes[ik, 2],1), round(boxes[ik, 3], 1)]
+                        box_ = [round(boxes[ik, 0]*o_width/width,1), round(boxes[ik, 1]*o_height/height,1), round(boxes[ik, 2]*o_width/width,1), round(boxes[ik, 3]*o_height/height,1)]
+                        # box_ = [round(box_*o_width/width,1), round(), round(boxes[ik, 2],1), round(boxes[ik, 3], 1)]
                         box_[2] = round(box_[2] - box_[0], 1)
                         box_[3] = round(box_[3] - box_[1], 1)
                         box_ = [float(b) for b in box_]

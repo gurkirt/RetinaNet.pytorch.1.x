@@ -35,8 +35,8 @@ import torch.nn as nn
 import torch.utils.data as data_utils
 from modules.solver import get_optim
 from modules import utils
-from modules.anchor_box_kmeans import anchorBox as kanchorBoxes
-from modules.anchor_box_base import anchorBox
+# from modules.anchor_box_kmeans import anchorBox as kanchorBoxes
+# from modules.anchor_box_retinanet import anchorBox
 from modules.detection_loss import MultiBoxLoss, YOLOLoss, FocalLoss
 from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
@@ -66,8 +66,8 @@ parser.add_argument('--use_bias', default=True, type=str2bool,help='0 mean no bi
 #  Name of the dataset only voc or coco are supported
 parser.add_argument('--dataset', default='coco', help='pretrained base model')
 # Input size of image only 600 is supprted at the moment 
-parser.add_argument('--min_size', default=600, type=int, help='Input Size for SSD')
-parser.add_argument('--max_size', default=1000, type=int, help='Input Size for SSD')
+parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
+parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
@@ -75,11 +75,11 @@ parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of 
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=180000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=90000, type=int, help='Number of training iterations')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--milestones', default='120000,160000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='60000,80000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
@@ -132,7 +132,7 @@ if username == 'gurkirt':
         args.save_root = '/mnt/mars-gamma/'
         args.vis_port = 8097
     elif hostname in ['sun','jupiter']:
-        args.data_root = '/mnt/mars-fast/datasets/'
+        args.data_root = '/mnt/mercury-fast/datasets/'
         args.save_root = '/mnt/mars-gamma/'
         if hostname in ['sun']:
             args.vis_port = 8096
@@ -157,8 +157,11 @@ torch.set_default_tensor_type('torch.FloatTensor')
 # Freeze batch normlisation layers
 def set_bn_eval(m):
     classname = m.__class__.__name__
-    if classname.find('BatchNorm') != -1:
+    if classname.find('BatchNorm') > -1:
         m.eval()
+        if m.affine:
+            m.weight.requires_grad = False
+            m.bias.requires_grad = False
     
 
 def main():
@@ -182,8 +185,6 @@ def main():
     source_dir = args.save_root+'/source/' # where to save the source
     utils.copy_source(source_dir)
 
-    anchors = 'None'
-    args.ar = 9
 
     if args.dataset == 'coco':
         args.train_sets = ['train2017']
@@ -199,14 +200,14 @@ def main():
     # ,
     train_transform = transforms.Compose([
                         #transforms.ColorJitter(brightness=0.10, contrast=0.10, saturation=0.10, hue=0.05),
-                        Resize((args.min_size, args.max_size)),
+                        Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
     train_dataset = Detection(args, train=True, image_sets=args.train_sets, transform=train_transform)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
-                        Resize((args.min_size, args.max_size)),
+                        Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
     val_dataset = Detection(args, train=False, image_sets=args.val_sets, transform=val_transform, full_test=False)
@@ -224,6 +225,12 @@ def main():
         print('\nLets do dataparallel\n')
         net = torch.nn.DataParallel(net)
 
+
+    if args.fbn:
+        if args.multi_gpu:
+            net.module.backbone_net.apply(set_bn_eval)
+        else:
+            net.backbone_net.apply(set_bn_eval)
     if args.fbn:
         if args.multi_gpu:
             net.module.backbone_net.apply(set_bn_eval)
@@ -232,10 +239,10 @@ def main():
     
     optimizer, scheduler, solver_print_str = get_optim(args, net)
 
-    train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset, solver_print_str)
+    train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_print_str)
 
 
-def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset, solver_print_str):
+def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_print_str):
     
     args.start_iteration = 0
     if args.resume>100:
@@ -248,7 +255,7 @@ def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset
         net.load_state_dict(torch.load(model_file_name))
         optimizer.load_state_dict(torch.load(optimizer_file_name))
         
-    anchors = anchors.cuda(0, non_blocking=True)
+    # anchors = anchors.cuda(0, non_blocking=True)
     if args.tensorboard:
         log_dir = args.save_root+'tensorboard-{date:%m-%d-%Hx}.log'.format(date=datetime.datetime.now())
         sw = SummaryWriter(log_dir=log_dir)
@@ -320,24 +327,26 @@ def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset
     start = time.perf_counter()
     iteration = args.start_iteration
     eopch = 0
-    num_bpe = len(train_data_loader)/args.batch_size
+    num_bpe = len(train_data_loader)
     while iteration <= args.max_iter:
-        for i, (images, gts, _, _) in enumerate(train_data_loader):
+        for i, (images, gts, counts, _, _) in enumerate(train_data_loader):
             if iteration > args.max_iter:
                 break
             iteration += 1
             epoch = int(iteration/num_bpe)
             images = images.cuda(0, non_blocking=True)
-            gts = [anno.cuda(0, non_blocking=True) for anno in gts]
+            gts = gts.cuda(0, non_blocking=True)
+            counts = counts.cuda(0, non_blocking=True)
             # forward
             torch.cuda.synchronize()
             data_time.update(time.perf_counter() - start)
 
             # print(images.size(), anchors.size())
-            reg_out, cls_out = net(images)
-
             optimizer.zero_grad()
-            loss_l, loss_c = criterion(cls_out, reg_out, gts, anchors)
+            # pdb.set_trace()
+            # print(gts.shape, counts.shape, images.shape)
+            loss_l, loss_c = net(images, gts, counts)
+            loss_l, loss_c = loss_l.mean() , loss_c.mean()
             loss = loss_l + loss_c
 
             loss.backward()
@@ -400,7 +409,13 @@ def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset
                 torch.save(net.state_dict(), '{:s}/model_{:06d}.pth'.format(args.save_root, iteration))
                 torch.save(optimizer.state_dict(), '{:s}/optimizer_{:06d}.pth'.format(args.save_root, iteration))
                 net.eval() # switch net to evaluation mode
-                mAP, ap_all, ap_strs, _ = validate(args, net, anchors, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
+                mAP, ap_all, ap_strs, _ = validate(args, net, val_data_loader, val_dataset, iteration, iou_thresh=args.iou_thresh)
+                net.train()
+                if args.fbn:
+                    if args.multi_gpu:
+                        net.module.backbone_net.apply(set_bn_eval)
+                    else:
+                        net.backbone_net.apply(set_bn_eval)
 
                 for ap_str in ap_strs:
                     print(ap_str)
@@ -426,13 +441,6 @@ def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset
                         win=val_lot,
                         update='append'
                             )
-                
-                net.train()
-                if args.fbn:
-                    if args.multi_gpu:
-                        net.module.backbone_net.apply(set_bn_eval)
-                    else:
-                        net.backbone_net.apply(set_bn_eval)
 
                 torch.cuda.synchronize()
                 t0 = time.perf_counter()
@@ -443,7 +451,7 @@ def train(args, net, optimizer, criterion, scheduler, train_dataset, val_dataset
     log_file.close()
 
 
-def validate(args, net, anchors,  val_data_loader, val_dataset, iteration_num, iou_thresh=0.5):
+def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh=0.5):
     """Test a FPN network on an image database."""
     print('Validating at ', iteration_num)
     num_images = len(val_dataset)
@@ -461,7 +469,7 @@ def validate(args, net, anchors,  val_data_loader, val_dataset, iteration_num, i
         activation = nn.Softmax(dim=2).cuda()
 
     with torch.no_grad():
-        for val_itr, (images, targets, img_indexs, wh) in enumerate(val_data_loader):
+        for val_itr, (images, targets, batch_counts, img_indexs, wh) in enumerate(val_data_loader):
 
             torch.cuda.synchronize()
             t1 = time.perf_counter()
@@ -469,7 +477,7 @@ def validate(args, net, anchors,  val_data_loader, val_dataset, iteration_num, i
             batch_size = images.size(0)
 
             images = images.cuda(0, non_blocking=True)
-            loc_data, conf_data = net(images)
+            decoded_boxes, conf_data = net(images)
 
             conf_scores_all = activation(conf_data).clone()
 
@@ -479,53 +487,40 @@ def validate(args, net, anchors,  val_data_loader, val_dataset, iteration_num, i
                 print('Forward Time {:0.3f}'.format(tf-t1))
             
             for b in range(batch_size):
-                width, height = args.input_dim, args.input_dim 
-                gt = targets[b].numpy()
-                gt[:,0] *= width
-                gt[:,2] *= width
-                gt[:,1] *= height
-                gt[:,3] *= height
+                width, height = wh[b][0], wh[b][1]
+                gt = targets[b, :batch_counts[b]].numpy()
                 gt_boxes.append(gt)
-                decoded_boxes = decode(loc_data[b], anchors, [0.1, 0.2]).clone()
-                conf_scores = conf_scores_all[b].clone()
+                # decoded_boxes = decode(loc_data[b], anchors).clone()
+                conf_scores = conf_scores_all[b]
                 #Apply nms per class and obtain the results
+                decoded_boxes_b = decoded_boxes[b]
                 for cl_ind in range(1, num_classes):
                     # pdb.set_trace()
                     scores = conf_scores[:, cl_ind].squeeze()
                     if args.loss_type == 'yolo':
                         scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze()
-                    scoresth, _ = torch.sort(scores, descending=True)
-                    # pdb.set_trace()
-                    max_scoresth = scoresth[2000]
-                    min_scoresth = 0.25
-                    # print(scoresth, args.conf_thresh)
-                    c_mask = scores.gt(min(max(max_scoresth, args.conf_thresh), min_scoresth))  # greater than minmum threshold
+                    c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
                     scores = scores[c_mask].squeeze()
                     # print('scores size',c_mask.sum())
                     if scores.dim() == 0:
                         # print(len(''), ' dim ==0 ')
                         det_boxes[cl_ind - 1].append(np.asarray([]))
                         continue
-                    boxes = decoded_boxes.clone()
-                    l_mask = c_mask.unsqueeze(1).expand_as(boxes)
-                    boxes = boxes[l_mask].view(-1, 4)
+                    # boxes = decoded_boxes_b.clone()
+                    l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes_b)
+                    boxes = decoded_boxes_b[l_mask].clone().view(-1, 4)
                     # idx of highest scoring and non-overlapping boxes per class
                     ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*3)  # idsn - ids after nms
                     scores = scores[ids[:min(args.topk,counts)]].cpu().numpy()
                     # pick = min(scores.shape[0], 20)
                     # scores = scores[:pick]
                     boxes = boxes[ids[:min(args.topk,counts)]].cpu().numpy()
-                    # print('boxes sahpe',boxes.shape)
-                    boxes[:,0] *= width
-                    boxes[:,2] *= width
-                    boxes[:,1] *= height
-                    boxes[:,3] *= height
 
                     for ik in range(boxes.shape[0]):
                         boxes[ik, 0] = max(0, boxes[ik, 0])
-                        boxes[ik, 2] = min(width-1, boxes[ik, 2])
+                        boxes[ik, 2] = min(width, boxes[ik, 2])
                         boxes[ik, 1] = max(0, boxes[ik, 1])
-                        boxes[ik, 3] = min(height-1, boxes[ik, 3])
+                        boxes[ik, 3] = min(height, boxes[ik, 3])
                     
                     cls_dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=True)
                     det_boxes[cl_ind-1].append(cls_dets)

@@ -31,7 +31,7 @@ class MultiBoxLoss(nn.Module):
         self.positive_threshold = positive_threshold
         self.neg_pos_ratio = neg_pos_ratio
 
-    def forward(self, confidence, predicted_locations, gts, anchors):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors):
         
         
         """
@@ -52,8 +52,8 @@ class MultiBoxLoss(nn.Module):
             # torch.cuda.synchronize()
             # t0 = time.perf_counter()
             for b in range(len(gts)):
-                gt_boxes = gts[b][:, :4]
-                gt_labels = gts[b][:, 4]
+                gt_boxes = gts[b, :counts[b], :4]
+                gt_labels = gts[b, :counts[b], 4]
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
                 conf, loc = box_utils.match_anchors(gt_boxes, gt_labels, anchors, iou_threshold=self.positive_threshold)
@@ -91,10 +91,10 @@ class YOLOLoss(nn.Module):
         self.negative_threshold =negative_threshold
         self.bce_loss = nn.BCELoss().cuda()
         self.pos_weight = 1.0
-        self.neg_weight = 20.0
+        self.neg_weight = 1.0
 
 
-    def forward(self, confidence, predicted_locations, gts, anchors):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors):
         """
         Compute classification loss and smooth l1 loss.
         Args:
@@ -110,7 +110,7 @@ class YOLOLoss(nn.Module):
         binary_preds = confidence[:,:, 0]
         object_preds = confidence[:,:,1:]
         num_classes = object_preds.size(2)
-
+        N = float(len(gts))
         gt_locations = []
         labels = []
         labels_bin = []
@@ -122,16 +122,16 @@ class YOLOLoss(nn.Module):
                 gt_labels = gts[b][:,4]
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
-                conf, loc = box_utils.match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=self.positive_threshold, nge_th=self.negative_threshold)
+                conf, loc = box_utils.match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=self.positive_threshold, nge_th=self.negative_threshold )
 
                 gt_locations.append(loc)
             
                 y_onehot = object_preds.new_zeros(conf.size(0), num_classes+1)
                 pos_conf = conf.clone()
-                pos_conf[pos_conf<0] = 0 # make ingonre bg # Should not matter anyways
+                pos_conf[pos_conf<0] = 0 # make ingonre bg
                 y_onehot[range(y_onehot.shape[0]), pos_conf] = 1.0
                 labels.append(y_onehot[:,1:])
-                labels_bin.append(conf.float())
+                labels_bin.append(conf)
             
             gt_locations = torch.stack(gt_locations, 0)
             labels = torch.stack(labels, 0)
@@ -140,25 +140,25 @@ class YOLOLoss(nn.Module):
         pos_mask = labels_bin > 0
         num_pos = max(1.0, float(pos_mask.sum()))
         
-        predicted_locations = predicted_locations[pos_mask, :].reshape(-1, 4)
-        gt_locations = gt_locations[pos_mask, :].reshape(-1, 4)
+        predicted_locations = predicted_locations[pos_mask].reshape(-1, 4)
+        gt_locations = gt_locations[pos_mask].reshape(-1, 4)
         localisation_loss = smooth_l1_loss(predicted_locations, gt_locations)/(num_pos * 4.0)
         
-        classification_loss = self.bce_loss(object_preds[pos_mask].reshape(-1, num_classes), labels[pos_mask].reshape(-1, num_classes))
-
-        # labels_bin = labels_bin.reshape(-1)
-        # binary_preds = binary_preds.reshape(-1)
+        # mask = labels_bin > -1 # Get mask to remove ignore examples
+        object_preds = object_preds[pos_mask].reshape(-1,num_classes) # Remove Ignore preds
+        labels = labels[pos_mask].reshape(-1,num_classes) # Remove Ignore labels
         # pdb.set_trace()
-        # labels_bin[]
-        
-        labels_bin[labels_bin>0] = 1
+        classification_loss = F.binary_cross_entropy(object_preds, labels, reduction='sum')/num_pos
+
+        labels_bin = labels_bin.float()
+        labels_bin[labels_bin>0] = 1.0
         neg_mask = labels_bin==0
-        # pdb.set_trace()
-        binary_loss_pos = self.bce_loss(binary_preds[pos_mask], labels_bin[pos_mask])
-        binary_loss_neg = self.bce_loss(binary_preds[neg_mask], labels_bin[neg_mask])
-        binary_loss = binary_loss_pos*self.pos_weight + binary_loss_neg*self.neg_weight 
-
-        return localisation_loss, classification_loss + binary_loss
+        
+        binary_loss_pos = F.binary_cross_entropy(binary_preds[pos_mask], labels_bin[pos_mask], reduction='sum')
+        binary_loss_neg = F.binary_cross_entropy(binary_preds[neg_mask], labels_bin[neg_mask], reduction='sum')
+        binary_loss = (binary_loss_pos*self.pos_weight + binary_loss_neg*self.neg_weight)/num_pos
+        # print(classification_loss, binary_loss)
+        return localisation_loss, (classification_loss + binary_loss)/2.0
 
 
 class FocalLoss(nn.Module):
@@ -175,7 +175,7 @@ class FocalLoss(nn.Module):
         self.gamma = 2.0
 
 
-    def forward(self, confidence, predicted_locations, gts, anchors):
+    def forward(self, confidence, predicted_locations, gts, counts, anchors):
         
         """
         

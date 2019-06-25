@@ -2,103 +2,103 @@ import torch, pdb, math
 import numpy as np
 
 def match_anchors(gt_boxes, gt_labels, anchors, iou_threshold=0.5, variances=[0.1, 0.2], seq_len=1):
-            # pdb.set_trace()
-            # pdb.set_trace()
-            num_mt = int(gt_labels.size(0)/seq_len)
-            
-            # pdb.set_trace()
-            seq_overlaps =[]
-            inds = torch.LongTensor([m*seq_len for m in range(num_mt)])  
-            # print(inds, num_mt)
-            ## get indexes of first frame in seq for each microtube
-            gt_labels = gt_labels[inds]
-            for s in range(seq_len):
-                seq_overlaps.append(jaccard(gt_boxes[inds+s, :], point_form(anchors[:, s*4:(s+1)*4])))
+    # pdb.set_trace()
+    # pdb.set_trace()
+    num_mt = int(gt_labels.size(0)/seq_len)
+    # pdb.set_trace()
+    seq_overlaps =[]
+    inds = torch.LongTensor([m*seq_len for m in range(num_mt)])  
+    # print(inds, num_mt)
+    ## get indexes of first frame in seq for each microtube
+    gt_labels = gt_labels[inds]
+    for s in range(seq_len):
+        seq_overlaps.append(jaccard(gt_boxes[inds+s, :], anchors))
 
-            overlaps = seq_overlaps[0]
-            # print(overlaps.max())
-            ## Compute average overlap
-            for s in range(seq_len-1):
-                overlaps = overlaps + seq_overlaps[s+1]
-            overlaps = overlaps/float(seq_len)
-            # pdb.set_trace()
-            # (Bipartite Matching)
-            # [1,num_objects] best anchor for each ground truth
-            best_anchor_overlap, best_anchor_idx = overlaps.max(1, keepdim=True)
-            # [1,num_anchors] best ground truth for each anchor
-            best_truth_overlap, best_truth_idx = overlaps.max(0, keepdim=True)
-            best_truth_idx.squeeze_(0)
-            best_truth_overlap.squeeze_(0)
-            best_anchor_idx.squeeze_(1)
-            best_anchor_overlap.squeeze_(1)
-            best_truth_overlap.index_fill_(0, best_anchor_idx, 2)  # ensure best anchor
-            # ensure every gt matches with its anchor of max overlap
-            for j in range(best_anchor_idx.size(0)):
-                best_truth_idx[best_anchor_idx[j]] = j
+    overlaps = seq_overlaps[0]
+    # print(overlaps.max())
+    ## Compute average overlap
+    for s in range(seq_len-1):
+        overlaps = overlaps + seq_overlaps[s+1]
+    overlaps = overlaps/float(seq_len)
+    
+    # (Bipartite Matching)
+    # [1,num_objects] best anchor for each ground truth
+    best_anchor_overlap, best_anchor_idx = overlaps.max(1, keepdim=True)
+    # [1,num_anchors] best ground truth for each anchor
+    best_truth_overlap, best_truth_idx = overlaps.max(0, keepdim=True)
+    best_truth_idx.squeeze_(0)
+    best_truth_overlap.squeeze_(0)
+    best_anchor_idx.squeeze_(1)
+    best_anchor_overlap.squeeze_(1)
+    best_truth_overlap.index_fill_(0, best_anchor_idx, 2)  # ensure best anchor
+    # ensure every gt matches with its anchor of max overlap
+    # pdb.set_trace()
+    for j in range(best_anchor_idx.size(0)):
+        best_truth_idx[best_anchor_idx[j]] = j
 
-            conf = gt_labels[best_truth_idx] + 1         # Shape: [num_anchors]
-            conf[best_truth_overlap < iou_threshold] = 0  # label as background
+    conf = gt_labels[best_truth_idx] + 1         # Shape: [num_anchors]
+    conf[best_truth_overlap < iou_threshold] = 0  # label as background
 
-            for s in range(seq_len):
-                st = gt_boxes[inds + s, :]
-                matches = st[best_truth_idx]  # Shape: [num_anchors,4]
-                if s == 0:
-                    loc = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)  
-                                # Shape: [num_anchors, 4] -- encode the gt boxes for frame i
-                else:
-                    temp = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)
-                    loc = torch.cat([loc, temp], 1)  # shape: [num_anchors x 4 * seql_len] : stacking the location targets for different frames
+    for s in range(seq_len):
+        st = gt_boxes[inds + s, :]
+        matches = st[best_truth_idx]  # Shape: [num_anchors,4]
+        if s == 0:
+            loc = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)  
+                        # Shape: [num_anchors, 4] -- encode the gt boxes for frame i
+        else:
+            temp = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)
+            loc = torch.cat([loc, temp], 1)  # shape: [num_anchors x 4 * seql_len] : stacking the location targets for different frames
 
-            return conf, loc
+    return conf, loc
 
 
 def match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=0.5, nge_th=0.4, variances=[0.1, 0.2], seq_len=1):
-            # pdb.set_trace()
-            # pdb.set_trace()
-            num_mt = int(gt_labels.size(0)/seq_len)
-            
-            # pdb.set_trace()
-            seq_overlaps =[]
-            inds = torch.LongTensor([m*seq_len for m in range(num_mt)])  
-            # print(inds, num_mt)
-            ## get indexes of first frame in seq for each microtube
-            gt_labels = gt_labels[inds]
-            for s in range(seq_len):
-                seq_overlaps.append(jaccard(gt_boxes[inds+s, :], point_form(anchors[:, s*4:(s+1)*4])))
+    # pdb.set_trace()
+    # pdb.set_trace()
+    num_mt = int(gt_labels.size(0)/seq_len)
+    
+    # pdb.set_trace()
+    seq_overlaps =[]
+    inds = torch.LongTensor([m*seq_len for m in range(num_mt)])  
+    # print(inds, num_mt)
+    ## get indexes of first frame in seq for each microtube
+    gt_labels = gt_labels[inds]
+    for s in range(seq_len):
+        seq_overlaps.append(jaccard(gt_boxes[inds+s, :], anchors))
 
-            overlaps = seq_overlaps[0]
-            # print(overlaps.max())
-            ## Compute average overlap
-            for s in range(seq_len-1):
-                overlaps = overlaps + seq_overlaps[s+1]
-            overlaps = overlaps/float(seq_len)
-            best_anchor_overlap, best_anchor_idx = overlaps.max(1, keepdim=True)
-            # [1,num_anchors] best ground truth for each anchor
-            best_truth_overlap, best_truth_idx = overlaps.max(0, keepdim=True)
-            best_truth_idx.squeeze_(0)
-            best_truth_overlap.squeeze_(0)
-            best_anchor_idx.squeeze_(1)
-            best_anchor_overlap.squeeze_(1)
-            best_truth_overlap.index_fill_(0, best_anchor_idx, 2)  # ensure best anchor
-            # ensure every gt matches with its anchor of max overlap
-            for j in range(best_anchor_idx.size(0)):
-                best_truth_idx[best_anchor_idx[j]] = j
+    overlaps = seq_overlaps[0]
+    # print(overlaps.max())
+    ## Compute average overlap
+    for s in range(seq_len-1):
+        overlaps = overlaps + seq_overlaps[s+1]
+    overlaps = overlaps/float(seq_len)
+    best_anchor_overlap, best_anchor_idx = overlaps.max(1, keepdim=True)
+    # [1,num_anchors] best ground truth for each anchor
+    best_truth_overlap, best_truth_idx = overlaps.max(0, keepdim=True)
+    best_truth_idx.squeeze_(0)
+    best_truth_overlap.squeeze_(0)
+    best_anchor_idx.squeeze_(1)
+    best_anchor_overlap.squeeze_(1)
+    best_truth_overlap.index_fill_(0, best_anchor_idx, 2)  # ensure best anchor
+    # ensure every gt matches with its anchor of max overlap
+    for j in range(best_anchor_idx.size(0)):
+        best_truth_idx[best_anchor_idx[j]] = j
 
-            conf = gt_labels[best_truth_idx] + 1  # assigned nearest class label
-            conf[best_truth_overlap < pos_th] = -1  # label as ignore
-            conf[best_truth_overlap < nge_th] = 0  # label as background
+    conf = gt_labels[best_truth_idx] + 1  # assigned nearest class label
+    conf[best_truth_overlap < pos_th] = -1  # label as ignore
+    conf[best_truth_overlap < nge_th] = 0  # label as background
 
-            for s in range(seq_len):
-                st = gt_boxes[inds + s, :]
-                matches = st[best_truth_idx]  # Shape: [num_anchors,4]
-                if s == 0:
-                    loc = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)  
-                                # Shape: [num_anchors, 4] -- encode the gt boxes for frame i
-                else:
-                    temp = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)
-                    loc = torch.cat([loc, temp], 1)  # shape: [num_anchors x 4 * seql_len] : stacking the location targets for different frames
+    for s in range(seq_len):
+        st = gt_boxes[inds + s, :]
+        matches = st[best_truth_idx]  # Shape: [num_anchors,4]
+        if s == 0:
+            loc = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)  
+                        # Shape: [num_anchors, 4] -- encode the gt boxes for frame i
+        else:
+            temp = encode(matches, anchors[:, s * 4:(s + 1) * 4], variances)
+            loc = torch.cat([loc, temp], 1)  # shape: [num_anchors x 4 * seql_len] : stacking the location targets for different frames
 
-            return conf, loc
+    return conf, loc
             
 
 def hard_negative_mining(loss, labels, neg_pos_ratio):
@@ -126,6 +126,7 @@ def hard_negative_mining(loss, labels, neg_pos_ratio):
     neg_mask = orders < num_neg
     return pos_mask | neg_mask
     
+
 def point_form(boxes):
     """ Convert anchor_boxes to (xmin, ymin, xmax, ymax)
     representation for comparison to point form ground truth data.
@@ -151,7 +152,9 @@ def center_size(boxes):
 
 
 def intersect(box_a, box_b):
-    """ We resize both tensors to [A,B,2] without new malloc:
+    """ 
+    
+    We resize both tensors to [A,B,2] without new malloc:
     [A,2] -> [A,1,2] -> [A,B,2]
     [B,2] -> [1,B,2] -> [A,B,2]
     Then we compute the area of intersect between box_a and box_b.
@@ -160,7 +163,9 @@ def intersect(box_a, box_b):
       box_b: (tensor) bounding boxes, Shape: [B,4].
     Return:
       (tensor) intersection area, Shape: [A,B].
+    
     """
+
     A = box_a.size(0)
     B = box_b.size(0)
     # pdb.set_trace()
@@ -219,7 +224,10 @@ def get_ovlp_cellwise(overlaps):
 
 
 def encode(matched, anchors, variances):
-    """Encode the variances from the anchorbox layers into the ground truth boxes
+    
+    """
+    
+    Encode the variances from the anchorbox layers into the ground truth boxes
     we have matched (based on jaccard overlap) with the anchor boxes.
     Args:
         matched: (tensor) Coords of ground truth for each anchor in point-form
@@ -227,42 +235,115 @@ def encode(matched, anchors, variances):
         anchors: (tensor) anchor boxes in center-offset form
             Shape: [num_anchors,4].
         variances: (list[float]) Variances of anchorboxes
+    
     Return:
         encoded boxes (tensor), Shape: [num_anchors, 4]
+    
     """
 
-    # dist b/t match center and anchor's center
-    g_cxcy = (matched[:, :2] + matched[:, 2:])/2 - anchors[:, :2]
-    # encode variance
-    g_cxcy /= (variances[0] * anchors[:, 2:])
-    # match wh / anchor wh
-    g_wh = (matched[:, 2:] - matched[:, :2]) / anchors[:, 2:]
-    g_wh = torch.log(g_wh) / variances[1]
-    # return target for smooth_l1_loss
-    return torch.cat([g_cxcy, g_wh], 1)  # [num_anchors,4]
+    TO_REMOVE = 1  # TODO remove
+    ex_widths = anchors[:, 2] - anchors[:, 0] + TO_REMOVE
+    ex_heights = anchors[:, 3] - anchors[:, 1] + TO_REMOVE
+    ex_ctr_x = anchors[:, 0] + 0.5 * ex_widths
+    ex_ctr_y = anchors[:, 1] + 0.5 * ex_heights
+
+    gt_widths = matched[:, 2] - matched[:, 0] + TO_REMOVE
+    gt_heights = matched[:, 3] - matched[:, 1] + TO_REMOVE
+    gt_ctr_x = matched[:, 0] + 0.5 * gt_widths
+    gt_ctr_y = matched[:, 1] + 0.5 * gt_heights
+
+    
+    targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths / variances[0]
+    targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights / variances[0]
+    targets_dw = torch.log(gt_widths / ex_widths) / variances[1]
+    targets_dh = torch.log(gt_heights / ex_heights) / variances[1]
+
+    targets = torch.stack((targets_dx, targets_dy, targets_dw, targets_dh), dim=1)
+
+    return targets
 
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
-def decode(loc, anchors, variances):
-    """Decode locations from predictions using anchors to undo
-    the encoding we did for offset regression at train time.
-    Args:
-        loc (tensor): location predictions for loc layers,
-            Shape: [num_anchors,4]
-        anchors (tensor): anchor boxes in center-offset form.
-            Shape: [num_anchors,4].
-        variances: (list[float]) Variances of anchorboxes
-    Return:
-        decoded bounding box predictions
-    """
-    #pdb.set_trace()
-    boxes = torch.cat((
-        anchors[:, :2] + loc[:, :2] * variances[0] * anchors[:, 2:],
-        anchors[:, 2:] * torch.exp(loc[:, 2:] * variances[1])), 1)
-    boxes[:, :2] -= boxes[:, 2:] / 2
-    boxes[:, 2:] += boxes[:, :2]
-    return boxes
+# def decode(loc, anchors, variances=[0.1, 0.2], bbox_xform_clip=math.log(1000. / 16)):
+#     """
+#     Decode locations from predictions using anchors to undo
+#     the encoding we did for offset regression at train time.
+#     Args:
+#         loc (tensor): location predictions for loc layers,
+#             Shape: [num_anchors,4]
+#         anchors (tensor): anchor boxes in center-offset form.
+#             Shape: [num_anchors,4].
+#         variances: (list[float]) Variances of anchorboxes
+#     Return:
+#         decoded bounding box predictions
+#     """
+#     #pdb.set_trace()
+#     TO_REMOVE = 1  # TODO remove
+#     ex_widths = anchors[:, 2] - anchors[:, 0] + TO_REMOVE
+#     ex_heights = anchors[:, 3] - anchors[:, 1] + TO_REMOVE
+#     ex_ctr_x = anchors[:, 0] + 0.5 * ex_widths
+#     ex_ctr_y = anchors[:, 1] + 0.5 * ex_heights
 
+#     # gt_widths = loc[:, 2] - loc[:, 0] + TO_REMOVE
+#     # gt_heights = loc[:, 3] - loc[:, 1] + TO_REMOVE
+#     # gt_ctr_x = matched[:, 0] + 0.5 * gt_widths
+#     # gt_ctr_y = matched[:, 1] + 0.5 * gt_heights
+#     # pdb.set_trace()
+
+#     pred_ctr_x = ex_ctr_x + loc[:, 0] * variances[0] * ex_widths
+#     pred_ctr_y = ex_ctr_y + loc[:, 1] * variances[0] * ex_heights
+#     pred_width = torch.exp(torch.clamp(loc[:, 2] * variances[1], bbox_xform_clip)) * ex_widths
+#     pred_height = torch.exp(torch.clamp(loc[:, 3] * variances[1], bbox_xform_clip)) * ex_heights
+#     boxes = torch.stack((pred_ctr_x, pred_ctr_y, pred_width, pred_height), dim=1)
+#     boxes[:, :2] -= boxes[:, 2:] / 2
+#     boxes[:, 2:] += boxes[:, :2]
+#     return boxes
+def decode(loc, anchors, variances=[0.1, 0.2], bbox_xform_clip=math.log(1000. / 16)):
+#     """
+#     Decode locations from predictions using anchors to undo
+#     the encoding we did for offset regression at train time.
+#     Args:
+#         loc (tensor): location predictions for loc layers,
+#             Shape: [num_anchors,4]
+#         anchors (tensor): anchor boxes in center-offset form.
+#             Shape: [num_anchors,4].
+#         variances: (list[float]) Variances of anchorboxes
+#     Return:
+#         decoded bounding box predictions
+#     """
+#     #pdb.set_trace()
+    TO_REMOVE = 1  # TODO remove
+    widths = anchors[:, 2] - anchors[:, 0] + TO_REMOVE
+    heights = anchors[:, 3] - anchors[:, 1] + TO_REMOVE
+    ctr_x = anchors[:, 0] + 0.5 * widths
+    ctr_y = anchors[:, 1] + 0.5 * heights
+
+    wx, wy, ww, wh = 10.0, 10.0, 5.0, 5.0
+    dx = loc[:, 0::4] * variances[0]
+    dy = loc[:, 1::4] * variances[0]
+    dw = loc[:, 2::4] * variances[1]
+    dh = loc[:, 3::4] * variances[1]
+
+    # Prevent sending too large values into torch.exp()
+    dw = torch.clamp(dw, max=bbox_xform_clip)
+    dh = torch.clamp(dh, max=bbox_xform_clip)
+
+    pred_ctr_x = dx * widths[:, None] + ctr_x[:, None]
+    pred_ctr_y = dy * heights[:, None] + ctr_y[:, None]
+    pred_w = torch.exp(dw) * widths[:, None]
+    pred_h = torch.exp(dh) * heights[:, None]
+
+    pred_boxes = torch.zeros_like(loc)
+    # x1
+    pred_boxes[:, 0::4] = pred_ctr_x - 0.5 * pred_w
+    # y1
+    pred_boxes[:, 1::4] = pred_ctr_y - 0.5 * pred_h
+    # x2 (note: "- 1" is correct; don't be fooled by the asymmetry)
+    pred_boxes[:, 2::4] = pred_ctr_x + 0.5 * pred_w - 1
+    # y2 (note: "- 1" is correct; don't be fooled by the asymmetry)
+    pred_boxes[:, 3::4] = pred_ctr_y + 0.5 * pred_h - 1
+
+    return pred_boxes
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
 def decode_seq(loc, anchors, variances, seq_len):

@@ -61,7 +61,7 @@ def make_object_lists(rootpath, subsets=['train2007']):
                 boxes.append(anno['bbox'])
                 labels.append(anno['label'])
             # print(labels)
-            img_list.append([annots[img_id]['set'], img_id, np.asarray(boxes).astype(np.float32), np.asarray(labels).astype(np.int64)])
+            img_list.append([annots[img_id]['set'], img_id, np.asarray(boxes).astype(np.float32), np.asarray(labels).astype(np.int64), annots[img_id]['wh']])
             ni += 1
 
     print_str = '\n\n*Num of images {:d} num of boxes {:d} avergae {:01f}\n\n'.format(ni, int(nb), nb/ni)
@@ -94,6 +94,7 @@ class Detection(data.Dataset):
         self.ids = list()
         self.image_loader = LoadImage()
         self.classes, self.ids, self.print_str, self.idlist = make_object_lists(self.root, image_sets)
+        self.max_targets = 20
     
     def __len__(self):
         return len(self.ids)
@@ -104,12 +105,13 @@ class Detection(data.Dataset):
         img_id = annot_info[1]
         boxes = annot_info[2] # boxes should be in x1 y1 x2 y2 format
         labels  =  annot_info[3]
+        wh = annot_info[4]
 
         img_name = '{:s}{:s}.jpg'.format(self.root, img_id)
         # print(img_name)
         # t0 = time.perf_counter()
         img = Image.open(img_name).convert('RGB')
-        # pdb.set_trace()
+        orig_w, orig_h = img.size
         # print(img.size)
         if self.train and np.random.random() < 0.5:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
@@ -118,11 +120,12 @@ class Detection(data.Dataset):
             boxes[:, 2] = boxes[:, 0] + w # boxes should be in x1 y1 x2 y2 [0,1] format
         
 
-        print(img.size)
+        # print(img.size, wh)
         img = self.transform(img)
-        _, width, height = img.shape
-        print(img.shape)
-        wh = [width, height]
+        _, height, width = img.shape
+        # print(img.shape, wh)
+        wh = [width, height, orig_w, orig_h]
+        # print(wh)
         boxes[:, 0] *= width # width x1
         boxes[:, 2] *= width # width x2
         boxes[:, 1] *= height # height y1
@@ -138,13 +141,26 @@ def custum_collate(batch):
     whs = []
     # fno = []
     # rgb_images, flow_images, aug_bxsl, prior_labels, prior_gt_locations, num_mt, index
+    
     for sample in batch:
         images.append(sample[0])
         targets.append(torch.FloatTensor(sample[1]))
         image_ids.append(sample[2])
         whs.append(sample[3])
     
-    images = get_image_list_resized(images)
+    counts = []
+    max_len = -1
+    for target in targets:
+        max_len = max(max_len, target.shape[0])
+        counts.append(target.shape[0])
+    new_targets = torch.zeros(len(targets), max_len, targets[0].shape[1])
+    cc = 0
+    for target in targets:
+        new_targets[cc,:target.shape[0]] = target
+        cc += 1
+    images_ = get_image_list_resized(images)
+    cts = torch.LongTensor(counts)
 
-    return images, targets, image_ids, whs
+    # pdb.set_trace()
+    return images_, new_targets, cts, image_ids, whs
 

@@ -13,53 +13,65 @@
 
 from modules.box_utils import point_form, jaccard
 from modules.anchor_box_base import anchorBox
-import torch
+from modules.anchor_box_retinanet import anchorBox as retina_anchor
+import torch, pdb
 import numpy as np
 from data.detectionDatasets import make_object_lists
 
 base_dir = '/home/gurkirt/datasets/'
-# base_dir = '/mnt/mercury-fast/datasets/'
+base_dir = '/mnt/mercury-fast/datasets/'
 
 input_dim = 600
 thresh = 0.5
 
 def main():
-    for dataset in ['voc', 'coco']:
-        for scales in [[1., 1.33, 1.7], [1., 1.5], [1.]]:
-                if dataset == 'coco':
-                        train_sets = ['train2017']
-                        val_sets = ['val2017']
-                else:
-                        train_sets = ['train2007', 'val2007', 'train2012', 'val2012']
-                        val_sets = ['test2007']
+	num_fms = 5 
+	for dataset in ['voc', 'coco']:
+		for input_size in [torch.Tensor([800, 1344]) ,]:# torch.Tensor([600,1000]), torch.Tensor([1000,600]), torch.Tensor([1000,1000])]:
+			# for scales in [[1., 1.33333, 1.6666], [1.]]:
+			if dataset == 'coco':
+				train_sets = ['train2017']
+				val_sets = ['val2017']
+			else:
+				train_sets = ['train2007', 'val2007', 'train2012', 'val2012']
+				val_sets = ['test2007']
+			
+			# classes, trainlist, print_str = make_lists(dataset=dataset, rootpath=base_dir+dataset+'/')
+			classes, trainlist, print_str, idlist = make_object_lists(base_dir+dataset+'/', train_sets)
+			# print(print_str)
+			anchor_boxes = retina_anchor()
+			grid_sizes = [(input_size/pow(2.,i+3)).ceil() for i in range(num_fms)] 
+			print(grid_sizes)
+			anchors = anchor_boxes(grid_sizes)
+			new_anchors = torch.load('/home/gurkirt/Dropbox/maskrcnn-benchmark/anchors.pth')
+			# pdb.set_trace()
+			# num_anchors = anchors.size(0)
+			# print(anchors.size()) 
+			all_recall = torch.FloatTensor(len(trainlist)*30,1)
+			count = 0
+			for index in range(len(trainlist)):
+				annot_info = trainlist[index]
+				img_id = annot_info[1]
+				targets = np.asarray(annot_info[3])
+				bboxes = torch.FloatTensor(annot_info[2]).cuda()
+				whs = torch.FloatTensor(annot_info[4])
+				bboxes[:,0] *= whs[0]
+				bboxes[:,2] *= whs[0]
+				bboxes[:,1] *= whs[1]
+				bboxes[:,3] *= whs[1]
 
-                # classes, trainlist, print_str = make_lists(dataset=dataset, rootpath=base_dir+dataset+'/')
-                classes, trainlist, print_str = make_object_lists(base_dir+dataset+'/', train_sets)
-                # print(print_str)
-                anchorbox = anchorBox(input_dim=input_dim, scale_ratios=scales)
-                
-                anchors = anchorbox.forward()
-                num_anchors = anchors.size(0)
-                print(anchors.size()) 
-                all_recall = torch.FloatTensor(len(trainlist)*30,1)
-                count = 0
-                for index in range(len(trainlist)):
-                        annot_info = trainlist[index]
-                        img_id = annot_info[1]
-                        targets = np.asarray(annot_info[3])
-                        bboxes = torch.FloatTensor(annot_info[2])
-                        overlaps = jaccard(bboxes, point_form(anchors))
-                        best_anchor_overlap, best_anchor_idx = overlaps.max(1, keepdim=True)
-                        # print(torch.sum(best_anchor_overlap>thresh))
-                        for bi in range(best_anchor_overlap.size(0)):
-                                bo = best_anchor_overlap[bi]
-                                # print(bo)
-                                all_recall[count, :] = bo
-                                count += 1
-                all_recall = all_recall[:count]
-                
-                print(scales)
-                print('{:s} recall more than 0.5 {:.02f} average is {:.02f}'.format(dataset, 100.0*torch.sum(all_recall>thresh)/count, torch.mean(all_recall)))
+				overlaps = jaccard(bboxes, anchors)
+				best_anchor_overlap, best_anchor_idx = overlaps.max(1, keepdim=True)
+				# print(torch.sum(best_anchor_overlap>thresh))
+				for bi in range(best_anchor_overlap.size(0)):
+					bo = best_anchor_overlap[bi]
+					# print(bo)
+					all_recall[count, :] = bo
+					count += 1
+			all_recall = all_recall[:count]
+
+			print(input_size)
+			print('{:s} recall more than 0.5 {:.02f} average is {:.02f}'.format(dataset, 100.0*torch.sum(all_recall>thresh)/count, torch.mean(all_recall)))
 
 def just_whs():
     for dataset in ['voc', 'coco']:
@@ -110,5 +122,5 @@ def just_whs():
                 print('{:s} recall more than 0.5 {:.02f} average is {:.02f}'.format(dataset, 100.0*torch.sum(all_recall>thresh)/count, torch.mean(all_recall)))
 
 if __name__ == '__main__':
-#     main()
-    just_whs()
+    main()
+    # just_whs()
