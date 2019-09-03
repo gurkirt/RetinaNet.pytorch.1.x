@@ -1,14 +1,17 @@
+"""
+
+Copyright (c) 2019 Gurkirt Singh 
+ All Rights Reserved.
+
+"""
+
 import torch.nn as nn
 import torch.nn.functional as F
 import torch, pdb, time
 from modules import box_utils
 
-'''
-Credits:: https://github.com/amdegroot/ssd.pytorch for multi-box loss
-& https://github.com/qfgaohao/pytorch-ssd/blob/master/vision/nn/multibox_loss.py pytorch1.x mulitbox loss
 
-'''
-
+# from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/layers/smooth_l1_loss.py
 def smooth_l1_loss(input, target, beta=1. / 9, reduction='sum'):
     n = torch.abs(input - target)
     cond = n < beta
@@ -17,7 +20,11 @@ def smooth_l1_loss(input, target, beta=1. / 9, reduction='sum'):
         return loss.mean()
     return loss.sum()
 
+'''
+Credits:: https://github.com/amdegroot/ssd.pytorch for multi-box loss
+& https://github.com/qfgaohao/pytorch-ssd/blob/master/vision/nn/multibox_loss.py pytorch1.x mulitbox loss
 
+'''
 class MultiBoxLoss(nn.Module):
     def __init__(self, positive_threshold, neg_pos_ratio=3):
         """
@@ -118,8 +125,10 @@ class YOLOLoss(nn.Module):
             # torch.cuda.synchronize()
             # t0 = time.perf_counter()
             for b in range(len(gts)):
-                gt_boxes = gts[b][:,:4]
-                gt_labels = gts[b][:,4]
+                # gt_boxes = gts[b][:,:4]
+                # gt_labels = gts[b][:,4]
+                gt_boxes = gts[b, :counts[b], :4]
+                gt_labels = gts[b, :counts[b], 4]
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
                 conf, loc = box_utils.match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=self.positive_threshold, nge_th=self.negative_threshold )
@@ -200,8 +209,8 @@ class FocalLoss(nn.Module):
             # torch.cuda.synchronize()
             # t0 = time.perf_counter()
             for b in range(len(gts)):
-                gt_boxes = gts[b][:,:4]
-                gt_labels = gts[b][:,4]
+                gt_boxes = gts[b, :counts[b], :4]
+                gt_labels = gts[b, :counts[b], 4]
                 gt_labels = gt_labels.type(torch.cuda.LongTensor)
 
                 conf, loc = box_utils.match_anchors_wIgnore(gt_boxes, gt_labels, anchors, pos_th=self.positive_threshold, nge_th=self.negative_threshold )

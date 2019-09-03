@@ -2,10 +2,8 @@
 
 """ 
 
-    Adapted from:
-
-    Modification by: Gurkirt Singh
-    Modification started: 13th March 2019
+    Author: Gurkirt Singh
+    Started on: 13th March 2019
     Parts of this files are from many github repos
     @longcw faster_rcnn_pytorch: https://github.com/longcw/faster_rcnn_pytorch
     @rbgirshick py-faster-rcnn https://github.com/rbgirshick/py-faster-rcnn
@@ -35,8 +33,6 @@ import torch.nn as nn
 import torch.utils.data as data_utils
 from modules.solver import get_optim
 from modules import utils
-# from modules.anchor_box_kmeans import anchorBox as kanchorBoxes
-# from modules.anchor_box_retinanet import anchorBox
 from modules.detection_loss import MultiBoxLoss, YOLOLoss, FocalLoss
 from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
@@ -69,23 +65,23 @@ parser.add_argument('--dataset', default='coco', help='pretrained base model')
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
 #  data loading argumnets
-parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=8, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
-parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=90000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=180000, type=int, help='Number of training iterations')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--milestones', default='60000,80000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='120000,160000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=str2bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
-parser.add_argument('--freezeupto', default=2, type=int, help='if 0 freeze or else keep updating bn layers')
+parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Loss function matching threshold
 parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min Jaccard index for matching')
@@ -93,7 +89,7 @@ parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min J
 
 # Evaluation hyperparameters
 parser.add_argument('--intial_val', default=5000, type=int, help='Number of training iterations before evaluation')
-parser.add_argument('--val_step', default=15000, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--val_step', default=50000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
 parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
@@ -278,6 +274,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     cls_losses = AverageMeter()
 
     # train_dataset = Detection(args, 'train', BaseTransform(args.input_dim, args.means, args.stds))
+
     log_file.write(train_dataset.print_str)
     log_file.write(val_dataset.print_str)
     print('Train-DATA :::>>>', train_dataset.print_str)
@@ -318,7 +315,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 
     train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size, num_workers=args.num_workers,
-                                  shuffle=True, pin_memory=True, collate_fn=custum_collate, drop_last=True)
+                                  shuffle=True, pin_memory=True, collate_fn=custum_collate)
     val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size, num_workers=args.num_workers,
                                  shuffle=False, pin_memory=True, collate_fn=custum_collate)
 
@@ -510,7 +507,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
                     l_mask = c_mask.unsqueeze(1).expand_as(decoded_boxes_b)
                     boxes = decoded_boxes_b[l_mask].clone().view(-1, 4)
                     # idx of highest scoring and non-overlapping boxes per class
-                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*3)  # idsn - ids after nms
+                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*20)  # idsn - ids after nms
                     scores = scores[ids[:min(args.topk,counts)]].cpu().numpy()
                     # pick = min(scores.shape[0], 20)
                     # scores = scores[:pick]

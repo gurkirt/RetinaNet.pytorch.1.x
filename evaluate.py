@@ -291,7 +291,7 @@ def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFil
                     l_mask = c_mask.unsqueeze(1).expand_as(boxes)
                     boxes = boxes[l_mask].view(-1, 4)
                     # idx of highest scoring and non-overlapping boxes per class
-                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*5)  # idsn - ids after nms
+                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*20)  # idsn - ids after nms
                     scores = scores[ids[:counts]].cpu().numpy()
                     pick = min(scores.shape[0], args.topk)
                     scores = scores[:pick]

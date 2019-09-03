@@ -1,7 +1,20 @@
 """
 
-Copyright (c) 2019 Gurkirt Singh 
- All Rights Reserved.
+UCF24 Dataset Classes
+Author: Gurkirt Singh
+
+Updated by Gurkirt Singh for ucf-24 , MSCOCO, VOC datasets
+
+FOV VOC:
+Original author: Francisco Massa for VOC dataset
+https://github.com/fmassa/vision/blob/voc_dataset/torchvision/datasets/voc.py
+Updated by: Ellis Brown, Max deGroot for VOC dataset
+
+Updated by: Gurkirt Singh to accpt text annotations for voc
+
+Target is in xmin, ymin, xmax, ymax, label
+coordinates are in range of [0, 1] normlised height and width
+
 
 """
 
@@ -16,14 +29,14 @@ import numpy as np
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from PIL import Image, ImageDraw
-
+from random import shuffle
 
 def resize(image, size):
     image = F.interpolate(image.unsqueeze(0), size=size, mode="nearest").squeeze(0)
     return image
 
 
-def make_object_lists(rootpath, subsets=['train2007']):
+def make_object_lists(rootpath, batch_size, train, subsets=['train2007']):
     with open(rootpath + 'annots.json', 'r') as f:
         db = json.load(f)
 
@@ -37,6 +50,8 @@ def make_object_lists(rootpath, subsets=['train2007']):
     ni = 0
     nb = 0.0
     print_str = ''
+    ratios = np.zeros(5000000)
+    cc = 0
     for img_id in annots.keys():
         # pdb.set_trace()
         if annots[img_id]['set'] in subsets:
@@ -48,12 +63,45 @@ def make_object_lists(rootpath, subsets=['train2007']):
                 boxes.append(anno['bbox'])
                 labels.append(anno['label'])
             # print(labels)
+            ratios[cc] = float(annots[img_id]['wh'][0])/float(annots[img_id]['wh'][1])
+            cc  += 1
             img_list.append([annots[img_id]['set'], img_id, np.asarray(boxes).astype(np.float32), np.asarray(labels).astype(np.int64), annots[img_id]['wh']])
             ni += 1
-
     print_str = '\n\n*Num of images {:d} num of boxes {:d} avergae {:01f}\n\n'.format(ni, int(nb), nb/ni)
+    ratios = ratios[:cc]
+    sort_ids = np.argsort(ratios)
 
-    return cls_list, img_list, print_str, idlist
+    new_img_list = []
+    for k in range(ratios.shape[0]):
+        new_img_list.append(img_list[sort_ids[k]])
+    
+    if not train:
+        return cls_list, new_img_list, print_str, idlist
+    else:
+        ratios = ratios[sort_ids]
+        print(ratios)
+        ## appedn some examples to complet the batch size
+        for c in range(batch_size):
+            if cc%batch_size == 0:
+                break
+            new_img_list.append(new_img_list[-c*2-1])
+            cc += 1
+        
+        # number of batchs
+        numb = len(new_img_list)//batch_size
+        batchs = [ [] for c in range(numb)]
+        
+        # fill each batch 
+        for c in range(len(new_img_list)):
+            batch_id = c//batch_size # batch id 
+            batchs[batch_id].append(new_img_list[c]) 
+        shuffle(batchs) # randomly shuffle the batchs
+        img_list = []
+        for b in range(numb):
+            for i in range(batch_size):
+                img_list.append(batchs[b][i]) # pick examples one by one from sorted batchs
+
+        return cls_list, img_list, print_str, idlist
 
 
 class Detection(data.Dataset):
@@ -69,7 +117,8 @@ class Detection(data.Dataset):
         self.transform = transform
         self.anno_transform = anno_transform
         self.ids = list()
-        self.classes, self.ids, self.print_str, self.idlist = make_object_lists(self.root, image_sets)
+        # self.image_loader = LoadImage()
+        self.classes, self.ids, self.print_str, self.idlist = make_object_lists(self.root, args.batch_size, train, image_sets)
         self.max_targets = 20
     
     def __len__(self):
@@ -136,6 +185,7 @@ def custum_collate(batch):
         cc += 1
     images_ = get_image_list_resized(images)
     cts = torch.LongTensor(counts)
-
+    # print(images_.shape)
+    # pdb.set_trace()
     return images_, new_targets, cts, image_ids, whs
 
