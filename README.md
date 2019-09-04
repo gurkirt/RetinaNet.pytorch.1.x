@@ -33,7 +33,7 @@ Multi-part loss function is also implemented here.
 
 ## TODO
 - Improve memory footprint
-- - Use clustering for batch making  so all the images of similar size
-- - see if we can improve loss functions
+    - Use clustering for batch making  so all the images of similar size
+    - see if we can improve loss functions
 - Implement multi-scale training
 - Implement fast evaluation like in paper
