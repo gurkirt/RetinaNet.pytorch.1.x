@@ -12,21 +12,20 @@ We only evaluate object detection, there is no support for mask prediction or se
 
 
 ## Architecture 
-
 ![RetinaNet Structure](/figures/retinaNet.png)
 
 ResNet is used as a backbone network (a) to build the pyramid features (b). 
 Each classification (c) and regression (d) subnet is made of 4 convolutional layers and finally a convolutional layer to predict the class scores and bounding box coordinated respectively.
 
-Similar to orignal paper, we freeze the batch normalisation layers of ResNet based backbone networks. Also, few inital layers are also frozen, see `fbn` flag in training arguments. 
+Similar to the original paper, we freeze the batch normalisation layers of ResNet based backbone networks. Also, few initial layers are also frozen, see `fbn` flag in training arguments. 
 
 ## Loss functions 
 ### OHEM with multi-box loss function
 We use multi-box loss function with online hard example mining (OHEM), similar to [SSD](https://arxiv.org/pdf/1512.02325.pdf).
 A huge thanks to Max DeGroot, Ellis Brown for [Pytorch implementation](https://github.com/amdegroot/ssd.pytorch) of SSD and loss function.
 
-### Focal losss
-Same as in in the orignal paper we use sigmoid focal loss, see [RetnaNet](https://arxiv.org/pdf/1708.02002.pdf). We use pure pytorch implementation of it.
+### Focal loss
+Same as in the original paper we use sigmoid focal loss, see [RetnaNet](https://arxiv.org/pdf/1708.02002.pdf). We use pure pytorch implementation of it.
 
 ### Yolo Loss
 Multi-part loss function from [YOLO](https://pjreddie.com/darknet/yolo/) is also implemented here.
@@ -41,6 +40,60 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 | Yolo | 50 |  600 |  33.3 | 52.2 | 36.1 | 15.7 | 36.7  | 46.8 |
 | OHEM | 50 |  600 |  34.7 | 52.5 | 37.0 | 16.9 | 37.9  | 48.9 |
 
+## Details
+- Input image size is `600`.
+- Resulting feature map size on five pyramid levels is `[75, 38, 19, 10, 5]` on one side 
+- Batch size is set to `16`, the learning rate of `0.01`.
+- COCO would need 3-4 GPUs because the number of classes is 80, hence loss function requires more memory
+
+## Installation
+- We used anaconda 3.7 as python distribution
+- You will need [Pytorch1.0](https://pytorch.org/get-started/locally/)
+- visdom and tensorboardX if you want to use the visualisation of loss and evaluation
+  -- if you want to use them set visdom/tensorboard flag equal to true while training 
+  -- and configure the visdom port in arguments in  `train.py.`
+
+## TRAINING
+Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from `prep` folder of this repo.
+Once you have pre-processed the dataset, then you are ready to train your networks.
+
+To train run the following command. 
+
+```
+python train.py --dataset=coco --basenet=resnet50 --batch_size=16 --lr=0.01
+```
+
+It will use all the visible GPUs. 
+You can append `CUDA_VISIBLE_DEVICES=<gpuids-comma-separated>` at the beginning of the above command to mask certain GPUs. We used 8 GPU machine to run these experiments.
+
+Please check the arguments in `train.py` to adjust the training process to your liking.
+
+## Evaluation
+Model is evaluated and saved after each `25K` iterations. 
+
+mAP@0.5 is computed after every `25K` iterations and at the end.
+
+Coco evaluation protocol is demonstraed  in `evaluate.py` 
+
+```
+python evaluate.py --dataset=coco --basenet=resnet50 --batch_size=16 --lr=0.01 -j=4  --ngpu=2 --eval_iters=90000
+```
+
+## COCO-API Result
+Here are results on COCO dataset using [COCO-API](https://github.com/cocodataset/cocoapi).
+Results using `cocoapi` are slightly different than above table what you see during training time. 
+An example is shown below
+
+
+#### TODO update the results below.
+```
+    Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.347
+    Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.525
+    Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.370
+    Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.169
+    Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.379
+    Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.489
+```
 
 ## TODO
 - Improve memory footprint
