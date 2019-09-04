@@ -10,7 +10,28 @@ This repository is a successive version of [FPN.pytorch.1.0](https://github.com/
 
 We only evaluate object detection, there is no support for mask prediction or semantic segmentation. Our objective to reproduce RetinaNet paper in its entirety. Even though the original [RetnaNet](https://arxiv.org/pdf/1708.02002.pdf) did not have mask prediction capability but the latest version [RetinaMask](https://arxiv.org/pdf/1901.03353.pdf) has it. If you want mask prediction with RentinaNet please go to [RetinaMask repo](https://github.com/chengyangfu/retinamask).
 
-# TODO
+
+## Architecture 
+
+![RetinaNet Structure](/figures/retinaNet.png)
+
+ResNet is used as a backbone network (a) to build the pyramid features (b). 
+Each classification (c) and regression (d) subnet is made of 4 convolutional layers and finally a convolutional layer to predict the class scores and bounding box coordinated respectively.
+
+Similar to orignal paper, we freeze the batch normalisation layers of ResNet based backbone networks. Also, few inital layers are also frozen, see `fbn` flag in training arguments. 
+
+## Loss function 
+### Multi-box loss function
+We use multi-box loss function with online hard example mining (OHEM), similar to [SSD](https://arxiv.org/pdf/1512.02325.pdf).
+A huge thanks to Max DeGroot, Ellis Brown for [Pytorch implementation](https://github.com/amdegroot/ssd.pytorch) of SSD and loss function.
+
+### Focal losss
+Same as in in the orignal paper we use sigmoid focal loss, see [RetnaNet](https://arxiv.org/pdf/1708.02002.pdf). We use pure pytorch implementation of it.
+
+### Yolo Loss
+Multi-part loss function is also implemented here.
+
+## TODO
 - Improve memory footprint
 - - Use clustering for batch making  so all the images of similar size
 - - see if we can improve loss functions
