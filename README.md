@@ -60,7 +60,7 @@ Once you have pre-processed the dataset, then you are ready to train your networ
 To train run the following command. 
 
 ```
-python train.py --dataset=coco --basenet=resnet50 --batch_size=16 --lr=0.01
+python train.py --loss_type=focal
 ```
 
 It will use all the visible GPUs. 
@@ -76,7 +76,7 @@ mAP@0.5 is computed after every `25K` iterations and at the end.
 Coco evaluation protocol is demonstraed  in `evaluate.py` 
 
 ```
-python evaluate.py --dataset=coco --basenet=resnet50 --batch_size=16 --lr=0.01 -j=4  --ngpu=2 --eval_iters=90000
+python evaluate.py --loss_type=focal
 ```
 
 ## COCO-API Result
