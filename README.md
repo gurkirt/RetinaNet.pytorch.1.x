@@ -20,8 +20,8 @@ Each classification (c) and regression (d) subnet is made of 4 convolutional lay
 
 Similar to orignal paper, we freeze the batch normalisation layers of ResNet based backbone networks. Also, few inital layers are also frozen, see `fbn` flag in training arguments. 
 
-## Loss function 
-### Multi-box loss function
+## Loss functions 
+### OHEM with multi-box loss function
 We use multi-box loss function with online hard example mining (OHEM), similar to [SSD](https://arxiv.org/pdf/1512.02325.pdf).
 A huge thanks to Max DeGroot, Ellis Brown for [Pytorch implementation](https://github.com/amdegroot/ssd.pytorch) of SSD and loss function.
 
@@ -29,7 +29,18 @@ A huge thanks to Max DeGroot, Ellis Brown for [Pytorch implementation](https://g
 Same as in in the orignal paper we use sigmoid focal loss, see [RetnaNet](https://arxiv.org/pdf/1708.02002.pdf). We use pure pytorch implementation of it.
 
 ### Yolo Loss
-Multi-part loss function is also implemented here.
+Multi-part loss function from [YOLO](https://pjreddie.com/darknet/yolo/) is also implemented here.
+
+## Results
+Here are the results on `coco` dataset.
+
+Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
+|----|-------|:----: |:----:| :-----:  | :---:| :---:| :---:| :---: |
+| Focal-[paper](https://arxiv.org/pdf/1708.02002.pdf) | 50 |  600 |  34.3 | 53.2 | 36.9 | 16.2 | 37.4  | 47.4 |
+| Focal-here | 50 |  600 |  34.5 | 52.2 | 36.6 | 16.9 | 38.0  | 48.4 |
+| Yolo | 50 |  600 |  33.3 | 52.2 | 36.1 | 15.7 | 36.7  | 46.8 |
+| OHEM | 50 |  600 |  34.7 | 52.5 | 37.0 | 16.9 | 37.9  | 48.9 |
+
 
 ## TODO
 - Improve memory footprint
