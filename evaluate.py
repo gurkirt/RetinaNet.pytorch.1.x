@@ -27,8 +27,7 @@ import torch.optim as optim
 import torch.utils.data as data_utils
 from torch.optim.lr_scheduler import MultiStepLR
 from modules import utils
-from modules.anchor_box_kmeans import anchorBox as kanchorBoxes
-from modules.anchor_box_base import anchorBox
+from modules.utils import str2bool
 from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
 from modules import  AverageMeter
@@ -38,10 +37,7 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from torchvision import transforms
 from data.transforms import Resize
-
-def str2bool(v):
-    return v.lower() in ("yes", "true", "t", "1")
-
+from train import validate
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
 # anchor_type to be used in the experiment
@@ -61,7 +57,7 @@ parser.add_argument('--max_size', default=1000, type=int, help='Input Size for F
 #  data loading argumnets
 parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
-parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
@@ -70,12 +66,12 @@ parser.add_argument('--eval_iters', default='90000', type=str, help='Chnage the 
 
 # Freeze batch normlisatio layer or not 
 parser.add_argument('--fbn', default=True, type=bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
-parser.add_argument('--freezeupto', default=2, type=int, help='if 0 freeze or else keep updating bn layers')
+parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or else keep updating bn layers')
 
 # Evaluation hyperparameters
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
-parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
+parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
 
 # Progress logging
@@ -88,49 +84,17 @@ parser.add_argument('--vis_port', default=8098, type=int, help='Port for Visdom 
 # Program arguments
 parser.add_argument('--man_seed', default=1, type=int, help='manualseed for reproduction')
 parser.add_argument('--multi_gpu', default=1, type=int, help='If  more than then use all visible GPUs by default only one GPU used ') 
+
+# source or dstination directories
 parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
 parser.add_argument('--save_root', default='/mnt/mercury-fast/datasets/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+parser.add_argument('--model_dir', default='', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
 
 ## Parse arguments
 args = parser.parse_args()
 
-import socket
-import getpass
-username = getpass.getuser()
-hostname = socket.gethostname()
-args.hostname = hostname
-args.user = username
-args.model_dir = args.data_root
-print('\n\n ', username, ' is using ', hostname, '\n\n')
-if username == 'gurkirt':
-    args.model_dir = '/mnt/mars-gamma/global-models/pytorch-imagenet/'
-    if hostname == 'mars':
-        args.data_root = '/mnt/mars-fast/datasets/'
-        args.save_root = '/mnt/mars-gamma/'
-        args.vis_port = 8097
-    elif hostname in ['sun','jupiter']:
-        args.data_root = '/mnt/mercury-fast/datasets/'
-        args.save_root = '/mnt/mars-gamma/'
-        if hostname in ['sun']:
-            args.vis_port = 8096
-        else:
-            args.vis_port = 8095
-    elif hostname == 'mercury':
-        args.data_root = '/mnt/mercury-fast/datasets/'
-        args.save_root = '/mnt/mars-gamma/'
-        args.vis_port = 8098
-    elif hostname.startswith('comp'):
-        args.data_root = '/home/gurkirt/datasets/'
-        args.save_root = '/home/gurkirt/cache/'
-        args.vis_port = 8097
-        visdom=False
-        args.model_dir = args.data_root+'weights/'
-    else:
-        raise('ERROR!!!!!!!! Specify directories')
-
-if args.tensorboard:
-    from tensorboardX import SummaryWriter
+args = utils.set_args(args, 'test') # set directories and subsets fo datasets
 
 ## set random seeds and global settings
 np.random.seed(args.man_seed)
@@ -140,36 +104,23 @@ torch.set_default_tensor_type('torch.FloatTensor')
 
 
 def main():
-
-    args.eval_iters = [int(val) for val in args.eval_iters.split(',')]
-    # args.loss_reset_step = 10
-    args.dataset = args.dataset.lower()
-    args.basenet = args.basenet.lower()
     
-    args.exp_name = 'FPN{:d}x{:d}-{:01d}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
-                                            args.min_size, args.max_size, int(args.multi_scale), args.dataset, args.basenet,
-                                            args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
-                                            args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
+    args.exp_name = utils.create_exp_name(args)
 
     args.save_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'
 
-    if args.dataset == 'coco':
-        args.train_sets = ['train2017']
-        args.val_sets = ['val2017']
-    else:
-        args.train_sets = ['train2007', 'val2007', 'train2012', 'val2012']
-        args.val_sets = ['test2007']
 
-    args.means =[0.485, 0.456, 0.406]
-    args.stds = [0.229, 0.224, 0.225]
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
+
     val_dataset = Detection(args, train=False, image_sets=args.val_sets, 
                             transform=val_transform, full_test=False)
+
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
+
     args.data_dir = val_dataset.root
     args.num_classes = len(val_dataset.classes) + 1
     args.classes = val_dataset.classes
@@ -184,7 +135,7 @@ def main():
 
     for iteration in args.eval_iters:
         args.det_itr = iteration
-        log_file = open("{pt:s}/testing-{it:06d}-{date:%m-%d-%Hx}.log".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 1)
+        log_file = open("{pt:s}/testing-{it:06d}-{date:%m-%d-%Hx}.log".format(pt=args.save_root, it=iteration, date=datetime.datetime.now()), "w", 10)
         log_file.write(args.exp_name + '\n')
         
         args.model_path = args.save_root + 'model_{:06d}.pth'.format(iteration)

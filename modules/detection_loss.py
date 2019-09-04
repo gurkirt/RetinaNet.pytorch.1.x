@@ -11,7 +11,8 @@ import torch, pdb, time
 from modules import box_utils
 
 
-# from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/layers/smooth_l1_loss.py
+# Credits:: from https://github.com/facebookresearch/maskrcnn-benchmark/blob/master/maskrcnn_benchmark/layers/smooth_l1_loss.py
+# smooth l1 with beta
 def smooth_l1_loss(input, target, beta=1. / 9, reduction='sum'):
     n = torch.abs(input - target)
     cond = n < beta
@@ -20,11 +21,9 @@ def smooth_l1_loss(input, target, beta=1. / 9, reduction='sum'):
         return loss.mean()
     return loss.sum()
 
-'''
-Credits:: https://github.com/amdegroot/ssd.pytorch for multi-box loss
-& https://github.com/qfgaohao/pytorch-ssd/blob/master/vision/nn/multibox_loss.py pytorch1.x mulitbox loss
-
-'''
+# Credits:: https://github.com/amdegroot/ssd.pytorch for multi-box loss
+# https://github.com/qfgaohao/pytorch-ssd/blob/master/vision/nn/multibox_loss.py pytorch1.x mulitbox loss
+# adopated by Gurkirt Singh
 class MultiBoxLoss(nn.Module):
     def __init__(self, positive_threshold, neg_pos_ratio=3):
         """

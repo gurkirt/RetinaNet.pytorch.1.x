@@ -1,7 +1,7 @@
 import torch, pdb
 import torch.optim as optim
-from .madamw import Adam as AdamM
-from .adamw import Adam as AdamW
+# from .madamw import Adam as AdamM
+# from .adamw import Adam as AdamW
 # from torch.optim.lr_scheduler import MultiStepLR
 
 class WarmupMultiStepLR(torch.optim.lr_scheduler._LRScheduler):
@@ -42,8 +42,10 @@ def get_optim(args, net):
         
         lr = args.lr
         wd = args.weight_decay
+        
         if args.optim == 'ADAM':
             wd = 0.0
+        
         if "bias" in key:
             lr = lr*2.0
         
@@ -61,10 +63,10 @@ def get_optim(args, net):
         optimizer = optim.SGD(params)
     elif args.optim == 'ADAM':
         optimizer = optim.Adam(params)
-    elif args.optim == 'ADAMW':
-        optimizer = AdamW(params)
-    elif args.optim == 'ADAMM':
-        optimizer = AdamM(params)
+    # elif args.optim == 'ADAMW':
+    #     optimizer = AdamW(params)
+    # elif args.optim == 'ADAMM':
+    #     optimizer = AdamM(params)
     else:
         error('Define optimiser type ')
     

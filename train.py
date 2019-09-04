@@ -10,7 +10,7 @@
     Which was adopated by: Ellis Brown, Max deGroot
     https://github.com/amdegroot/ssd.pytorch
 
-    Futher updates from 
+    mainly adopted from
     https://github.com/gurkirt/realtime-action-detection
 
     maybe more but that is where I got these from
@@ -37,10 +37,9 @@ from modules.detection_loss import MultiBoxLoss, YOLOLoss, FocalLoss
 from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
 from modules import  AverageMeter
-from data import Detection, BaseTransform, custum_collate
+from data import Detection, custum_collate
 from torchvision import transforms
 from data.transforms import Resize
-# from models.fpn_heads import build_fpn_unshared
 from models.retinanet_shared_heads import build_retinanet_shared_heads
 
 def str2bool(v):
@@ -50,8 +49,6 @@ def make_01(v):
        return 1 if v>0 else 0
 
 parser = argparse.ArgumentParser(description='Training single stage FPN with OHEM, resnet as backbone')
-# anchor_type to be used in the experiment
-parser.add_argument('--anchor_type', default='kmeans', help='kmeans or default')
 # Name of backbone networ, e.g. resnet18, resnet34, resnet50, resnet101 resnet152 are supported 
 parser.add_argument('--basenet', default='resnet50', help='pretrained base model')
 # if output heads are have shared features or not: 0 is no-shareing else sharining enabled
@@ -65,30 +62,30 @@ parser.add_argument('--dataset', default='coco', help='pretrained base model')
 parser.add_argument('--min_size', default=600, type=int, help='Input Size for FPN')
 parser.add_argument('--max_size', default=1000, type=int, help='Input Size for FPN')
 #  data loading argumnets
-parser.add_argument('--batch_size', default=8, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=16, type=int, help='Batch size for training')
 # Number of worker to load data in parllel
-parser.add_argument('--num_workers', '-j', default=8, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--num_workers', '-j', default=4, type=int, help='Number of workers used in dataloading')
 # optimiser hyperparameters
 parser.add_argument('--optim', default='SGD', type=str, help='Optimiser type')
 parser.add_argument('--resume', default=0, type=int, help='Resume from given iterations')
-parser.add_argument('--max_iter', default=180000, type=int, help='Number of training iterations')
+parser.add_argument('--max_iter', default=90000, type=int, help='Number of training iterations')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--loss_type', default='mbox', type=str, help='loss_type')
-parser.add_argument('--milestones', default='120000,160000', type=str, help='Chnage the lr @')
+parser.add_argument('--milestones', default='60000,80000', type=str, help='Chnage the lr @')
 parser.add_argument('--gammas', default='0.1,0.1', type=str, help='Gamma update for SGD')
 parser.add_argument('--weight_decay', default=1e-4, type=float, help='Weight decay for SGD')
 
-# Freeze batch normlisatio layer or not 
-parser.add_argument('--fbn', default=True, type=str2bool, help='if less than 1 mean freeze or else any positive values keep updating bn layers')
-parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or else keep updating bn layers')
+# Freeze layers or not 
+parser.add_argument('--fbn','--freeze_bn', default=True, type=str2bool, help='freeze bn layers if true or else keep updating bn layers')
+parser.add_argument('--freezeupto', default=1, type=int, help='layer group number in ResNet up to which needs to be frozen')
 
 # Loss function matching threshold
 parser.add_argument('--positive_threshold', default=0.5, type=float, help='Min Jaccard index for matching')
 parser.add_argument('--negative_threshold', default=0.4, type=float, help='Min Jaccard index for matching')
 
 # Evaluation hyperparameters
-parser.add_argument('--intial_val', default=5000, type=int, help='Number of training iterations before evaluation')
+parser.add_argument('--intial_val', default=5000, type=int, help='Initial number of training iterations before evaluation')
 parser.add_argument('--val_step', default=50000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
@@ -105,41 +102,17 @@ parser.add_argument('--vis_port', default=8098, type=int, help='Port for Visdom 
 # Program arguments
 parser.add_argument('--man_seed', default=123, type=int, help='manualseed for reproduction')
 parser.add_argument('--multi_gpu', default=True, type=str2bool, help='If  more than 0 then use all visible GPUs by default only one GPU used ') 
-# Use CUDA_VISIBLE_DEVICES=0,1,4,6 to selct GPUs to use
+
+# Use CUDA_VISIBLE_DEVICES=0,1,4,6 to select GPUs to use
 parser.add_argument('--data_root', default='/mnt/mercury-fast/datasets/', help='Location to root directory fo dataset') # /mnt/mars-fast/datasets/
 parser.add_argument('--save_root', default='/mnt/mercury-fast/datasets/', help='Location to save checkpoint models') # /mnt/sun-gamma/datasets/
+parser.add_argument('--model_dir', default='', help='Location to where imagenet pretrained models exists') # /mnt/mars-fast/datasets/
 
 
 ## Parse arguments
 args = parser.parse_args()
 
-import socket
-import getpass
-username = getpass.getuser()
-hostname = socket.gethostname()
-args.hostname = hostname
-args.user = username
-args.model_dir = args.data_root
-print('\n\n ', username, ' is using ', hostname, '\n\n')
-if username == 'gurkirt':
-    args.model_dir = '/mnt/mars-gamma/global-models/pytorch-imagenet/'
-    if hostname == 'mars':
-        args.data_root = '/mnt/mars-fast/datasets/'
-        args.save_root = '/mnt/mars-gamma/'
-        args.vis_port = 8097
-    elif hostname in ['sun','jupiter']:
-        args.data_root = '/mnt/mercury-fast/datasets/'
-        args.save_root = '/mnt/mars-gamma/'
-        if hostname in ['sun']:
-            args.vis_port = 8096
-        else:
-            args.vis_port = 8095
-    elif hostname == 'mercury':
-        args.data_root = '/mnt/mercury-fast/datasets/'
-        args.save_root = '/mnt/mars-gamma/'
-        args.vis_port = 8098
-    else:
-        raise('ERROR!!!!!!!! Specify directories')
+args = utils.set_args(args) # set directories and subsets fo datasets
 
 if args.tensorboard:
     from tensorboardX import SummaryWriter
@@ -150,47 +123,18 @@ torch.manual_seed(args.man_seed)
 torch.cuda.manual_seed_all(args.man_seed)
 torch.set_default_tensor_type('torch.FloatTensor')
 
-# Freeze batch normlisation layers
-def set_bn_eval(m):
-    classname = m.__class__.__name__
-    if classname.find('BatchNorm') > -1:
-        m.eval()
-        if m.affine:
-            m.weight.requires_grad = False
-            m.bias.requires_grad = False
-    
 
 def main():
-    args.milestones = [int(val) for val in args.milestones.split(',')]
-    args.gammas = [float(val) for val in args.gammas.split(',')]
-
-    args.dataset = args.dataset.lower()
-    args.basenet = args.basenet.lower()
-
-    args.exp_name = 'FPN{:d}x{:d}-{:01d}-{:s}-{:s}-hl{:01d}s{:01d}-bn{:d}f{:d}b{:d}-bs{:02d}-{:s}-lr{:06d}-{:s}'.format(
-                                            args.min_size, args.max_size, int(args.multi_scale), args.dataset, args.basenet,
-                                            args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
-                                            args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
-
+    
+    args.exp_name = utils.create_exp_name(args)
     args.save_root += args.dataset+'/'
     args.save_root = args.save_root+'cache/'+args.exp_name+'/'
 
-    if not os.path.isdir(args.save_root): # if save directory doesn't exist create it
+    if not os.path.isdir(args.save_root): #if save directory doesn't exist create it
         os.makedirs(args.save_root)
 
     source_dir = args.save_root+'/source/' # where to save the source
     utils.copy_source(source_dir)
-
-
-    if args.dataset == 'coco':
-        args.train_sets = ['train2017']
-        args.val_sets = ['val2017']
-    else:
-        args.train_sets = ['train2007', 'val2007', 'train2012', 'val2012']
-        args.val_sets = ['test2007']
-
-    args.means =[0.485, 0.456, 0.406]
-    args.stds = [0.229, 0.224, 0.225]
 
     print('\nLoading Datasets')
     # ,
@@ -221,17 +165,11 @@ def main():
         print('\nLets do dataparallel\n')
         net = torch.nn.DataParallel(net)
 
-
     if args.fbn:
         if args.multi_gpu:
-            net.module.backbone_net.apply(set_bn_eval)
+            net.module.backbone_net.apply(utils.set_bn_eval)
         else:
-            net.backbone_net.apply(set_bn_eval)
-    if args.fbn:
-        if args.multi_gpu:
-            net.module.backbone_net.apply(set_bn_eval)
-        else:
-            net.backbone_net.apply(set_bn_eval)
+            net.backbone_net.apply(utils.set_bn_eval)
     
     optimizer, scheduler, solver_print_str = get_optim(args, net)
 
@@ -410,9 +348,9 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
                 net.train()
                 if args.fbn:
                     if args.multi_gpu:
-                        net.module.backbone_net.apply(set_bn_eval)
+                        net.module.backbone_net.apply(utils.set_bn_eval)
                     else:
-                        net.backbone_net.apply(set_bn_eval)
+                        net.backbone_net.apply(utils.set_bn_eval)
 
                 for ap_str in ap_strs:
                     print(ap_str)
