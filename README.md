@@ -56,7 +56,7 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 - You will need to install [COCO-API](https://github.com/cocodataset/cocoapi) to use evalute script.
 
 ### Datasets and other downloads
-- Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from `prep` folder of this repo.
+- Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from [`prep`](https://github.com/gurkirt/RetinaNet/tree/master/prep) folder of this repo.
 - Weights are initialised with imagenet pretrained models, specify the path pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). This is a requirement of training process. 
 
 
