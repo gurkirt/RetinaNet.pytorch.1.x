@@ -36,7 +36,7 @@ Here are the results on `coco` dataset.
 Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 |----|-------|:----: |:----:| :-----:  | :---:| :---:| :---:| :---: |
 | Focal-[paper](https://arxiv.org/pdf/1708.02002.pdf) | 50 |  600 |  34.3 | 53.2 | 36.9 | 16.2 | 37.4  | 47.4 |
-| Focal-here | 50 |  600 |  34.5 | 52.2 | 36.6 | 16.9 | 38.0  | 48.4 |
+| Focal-here | 50 |  600 |  34.3 | 52.5 | 36.1 | 16.4 | 37.9  | 48.0 |
 | Yolo | 50 |  600 |  33.3 | 52.2 | 36.1 | 15.7 | 36.7  | 46.8 |
 | OHEM | 50 |  600 |  34.7 | 52.5 | 37.0 | 16.9 | 37.9  | 48.9 |
 
@@ -48,10 +48,11 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 
 ## Installation
 - We used anaconda 3.7 as python distribution
-- You will need [Pytorch1.0](https://pytorch.org/get-started/locally/)
+- You will need [Pytorch1.x](https://pytorch.org/get-started/locally/)
 - visdom and tensorboardX if you want to use the visualisation of loss and evaluation
-  -- if you want to use them set visdom/tensorboard flag equal to true while training 
-  -- and configure the visdom port in arguments in  `train.py.`
+  - if you want to use them set visdom/tensorboard flag equal to true while training 
+  - and configure the visdom port in arguments in  `train.py.`
+- You will need to install [COCO-API](https://github.com/cocodataset/cocoapi) to use evalute script.
 
 ## TRAINING
 Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from `prep` folder of this repo.
@@ -75,6 +76,7 @@ mAP@0.5 is computed after every `25K` iterations and at the end.
 
 Coco evaluation protocol is demonstraed  in `evaluate.py` 
 
+
 ```
 python evaluate.py --loss_type=focal
 ```
@@ -82,17 +84,23 @@ python evaluate.py --loss_type=focal
 ## COCO-API Result
 Here are results on COCO dataset using [COCO-API](https://github.com/cocodataset/cocoapi).
 Results using `cocoapi` are slightly different than above table what you see during training time. 
-An example is shown below
 
 
 #### TODO update the results below.
 ```
-    Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.347
+    Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.348
     Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.525
     Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.370
     Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.169
-    Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.379
+    Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.380
     Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.489
+    Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.298
+    Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.454
+    Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.487
+    Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.268
+    Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.536
+    Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.651
+
 ```
 
 ## TODO
