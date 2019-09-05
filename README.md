@@ -44,6 +44,7 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 - Input image size is `600`.
 - Resulting feature map size on five pyramid levels is `[75, 38, 19, 10, 5]` on one side 
 - Batch size is set to `16`, the learning rate of `0.01`.
+- Weights for initial layers are frozen see `freezeupto` flag in `train.py`
 - COCO would need 3-4 GPUs because the number of classes is 80, hence loss function requires more memory
 
 ## Installation
@@ -54,8 +55,13 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
   - and configure the visdom port in arguments in  `train.py.`
 - You will need to install [COCO-API](https://github.com/cocodataset/cocoapi) to use evalute script.
 
+### Datasets and other downloads
+- Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from `prep` folder of this repo.
+- Weights are initialised with imagenet pretrained models, specify the path pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). This is a requirement of training process. 
+
+
 ## TRAINING
-Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from `prep` folder of this repo.
+
 Once you have pre-processed the dataset, then you are ready to train your networks.
 
 To train run the following command. 
