@@ -48,7 +48,7 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 - COCO would need 3-4 GPUs because the number of classes is 80, hence loss function requires more memory
 
 ## Installation
-- We used anaconda 3.7 as python distribution
+- We used anaconda as python 3.7 distribution
 - You will need [Pytorch1.x](https://pytorch.org/get-started/locally/)
 - visdom and tensorboardX if you want to use the visualisation of loss and evaluation
   - if you want to use them set visdom/tensorboard flag equal to true while training 
@@ -57,7 +57,7 @@ Loss |depth | input | AP    | AP_50   | AP_75 | AP_S | AP_M | AP_L |
 
 ### Datasets and other downloads
 - Please follow dataset preparation [README](https://github.com/gurkirt/FPN.pytorch/tree/master/prep) from [`prep`](https://github.com/gurkirt/RetinaNet/tree/master/prep) folder of this repo.
-- Weights are initialised with imagenet pretrained models, specify the path pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). This is a requirement of training process. 
+- Weights are initialised with imagenet pretrained models, specify the path of pre-saved models, `model_dir` in `train.py`. Download them from [torchvision models](https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py). This is a requirement of training process. 
 
 
 ## TRAINING
