@@ -31,26 +31,32 @@ class Resize(object):
 
     # modified from torchvision to add support for max size
     def get_size(self, image_size):
-        w, h = image_size
-        size = self.min_size
-        max_size = self.max_size
-        if max_size is not None:
-            min_original_size = float(min((w, h)))
-            max_original_size = float(max((w, h)))
-            if max_original_size / min_original_size * size > max_size:
-                size = int(round(max_size * min_original_size / max_original_size))
-
-        if (w <= h and w == size) or (h <= w and h == size):
-            return (h, w)
-
-        if w < h:
-            ow = size
-            oh = int(size * h / w)
+        
+        if self.min_size == self.max_size:
+        
+            return (self.min_size, self.max_size)
+        
         else:
-            oh = size
-            ow = int(size * w / h)
+            w, h = image_size
+            size = self.min_size
+            max_size = self.max_size
+            if max_size is not None:
+                min_original_size = float(min((w, h)))
+                max_original_size = float(max((w, h)))
+                if max_original_size / min_original_size * size > max_size:
+                    size = int(round(max_size * min_original_size / max_original_size))
 
-        return (oh, ow)
+            if (w <= h and w == size) or (h <= w and h == size):
+                return (h, w)
+
+            if w < h:
+                ow = size
+                oh = int(size * h / w)
+            else:
+                oh = size
+                ow = int(size * w / h)
+
+            return (oh, ow)
 
     def __call__(self, image):
         size = self.get_size(image.size)

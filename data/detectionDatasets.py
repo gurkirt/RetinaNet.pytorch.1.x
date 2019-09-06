@@ -136,6 +136,6 @@ def custum_collate(batch):
         cc += 1
     images_ = get_image_list_resized(images)
     cts = torch.LongTensor(counts)
-
+    # print(images_.shape)
     return images_, new_targets, cts, image_ids, whs
 

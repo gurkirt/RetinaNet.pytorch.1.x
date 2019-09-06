@@ -229,6 +229,8 @@ def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFil
                 for cl_ind in range(1, num_classes):
                     # pdb.set_trace()
                     scores = conf_scores[:, cl_ind].squeeze()
+                    if args.loss_type == 'yolo':
+                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze()
                     # scoresth, _ = torch.sort(scores, descending=True)
                     c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
                     # c_mask = scores.gt(min(max(max_scoresth, args.conf_thresh), min_scoresth))  # greater than minmum threshold
