@@ -90,7 +90,7 @@ parser.add_argument('--intial_val', default=5000, type=int, help='Initial number
 parser.add_argument('--val_step', default=25000, type=int, help='Number of training iterations before evaluation')
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
-parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
+parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
 
 # Progress logging
