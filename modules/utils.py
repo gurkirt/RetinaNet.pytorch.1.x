@@ -67,7 +67,7 @@ def set_args(args, iftest='train'):
                 args.vis_port = 8095
         elif hostname == 'mercury':
             args.data_root = '/mnt/mercury-fast/datasets/'
-            args.save_root = '/mnt/mars-gamma/'
+            args.save_root = '/mnt/venus-alpha/'
             args.vis_port = 8098
         else:
             raise('ERROR!!!!!!!! Specify directories')

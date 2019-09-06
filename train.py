@@ -254,10 +254,11 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
 
 
     train_data_loader = data_utils.DataLoader(train_dataset, args.batch_size, num_workers=args.num_workers,
-                                  shuffle=True, pin_memory=True, collate_fn=custum_collate)
+                                  shuffle=True, pin_memory=True, collate_fn=custum_collate, drop_last=True)
+    
+    
     val_data_loader = data_utils.DataLoader(val_dataset, args.batch_size, num_workers=args.num_workers,
                                  shuffle=False, pin_memory=True, collate_fn=custum_collate)
-
   
     torch.cuda.synchronize()
     start = time.perf_counter()

@@ -22,6 +22,7 @@ def get_image_list_resized(tensors):
     # image_sizes = [im.shape[-2:] for im in tensors]
     return batched_imgs
 
+
 # from https://github.com/chengyangfu/retinamask/blob/master/maskrcnn_benchmark/data/transforms/transforms.py 
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 class Resize(object):
