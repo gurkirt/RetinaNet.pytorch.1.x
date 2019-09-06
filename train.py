@@ -151,6 +151,7 @@ def main():
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
+                        
     val_dataset = Detection(args, train=False, image_sets=args.val_sets, transform=val_transform, full_test=False)
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
     
