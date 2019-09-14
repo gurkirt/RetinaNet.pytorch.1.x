@@ -56,9 +56,8 @@ def make_object_lists(rootpath, subsets=['train2007']):
     return cls_list, img_list, print_str, idlist
 
 
-class Detection(data.Dataset):
-    """UCF24 Action Detection dataset class for pytorch dataloader
-    """
+class DetectionDataset(data.Dataset):
+    """Detection Dataset class for pytorch dataloader"""
 
     def __init__(self, args, train=True, image_sets=['train2017'], transform=None, anno_transform=None, full_test=False):
 

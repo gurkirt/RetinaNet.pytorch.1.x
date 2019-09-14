@@ -1,2 +1,2 @@
-from .detectionDatasets import Detection, custum_collate
+from .detectionDatasets import DetectionDataset, custum_collate
 

@@ -81,7 +81,7 @@ class MultiBoxLoss(nn.Module):
         predicted_locations = predicted_locations[pos_mask, :].reshape(-1, 4)
         gt_locations = gt_locations[pos_mask, :].reshape(-1, 4)
         
-        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations)/(num_pos * 4.0)
+        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')/(num_pos * 4.0)
         
         return localisation_loss, classification_loss
 
@@ -151,7 +151,7 @@ class YOLOLoss(nn.Module):
         
         predicted_locations = predicted_locations[pos_mask].reshape(-1, 4)
         gt_locations = gt_locations[pos_mask].reshape(-1, 4)
-        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations)/(num_pos * 4.0)
+        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')/(num_pos * 4.0)
         
         # mask = labels_bin > -1 # Get mask to remove ignore examples
         object_preds = object_preds[pos_mask].reshape(-1,num_classes) # Remove Ignore preds
@@ -235,7 +235,7 @@ class FocalLoss(nn.Module):
         
         predicted_locations = predicted_locations[pos_mask].reshape(-1, 4)
         gt_locations = gt_locations[pos_mask].reshape(-1, 4)
-        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations)/(num_pos * 4.0)
+        localisation_loss = smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')/(num_pos * 4.0)
         
         mask = labels_bin > -1 # Get mask to remove ignore examples
         object_preds = object_preds[mask].reshape(-1,num_classes) # Remove Ignore preds

@@ -38,7 +38,7 @@ from modules.detection_loss import MultiBoxLoss, YOLOLoss, FocalLoss
 from modules.evaluation import evaluate_detections
 from modules.box_utils import decode, nms
 from modules import  AverageMeter
-from data import Detection, custum_collate
+from data import DetectionDataset, custum_collate
 from torchvision import transforms
 from data.transforms import Resize
 from models.retinanet_shared_heads import build_retinanet_shared_heads
@@ -145,14 +145,14 @@ def main():
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means, std=args.stds)])
 
-    train_dataset = Detection(args, train=True, image_sets=args.train_sets, transform=train_transform)
+    train_dataset = DetectionDataset(args, train=True, image_sets=args.train_sets, transform=train_transform)
     print('Done Loading Dataset Train Dataset :::>>>\n',train_dataset.print_str)
     val_transform = transforms.Compose([ 
                         Resize(args.min_size, args.max_size),
                         transforms.ToTensor(),
                         transforms.Normalize(mean=args.means,std=args.stds)])
                         
-    val_dataset = Detection(args, train=False, image_sets=args.val_sets, transform=val_transform, full_test=False)
+    val_dataset = DetectionDataset(args, train=False, image_sets=args.val_sets, transform=val_transform, full_test=False)
     print('Done Loading Dataset Validation Dataset :::>>>\n',val_dataset.print_str)
     
     args.num_classes = len(train_dataset.classes) + 1
@@ -213,7 +213,7 @@ def train(args, net, optimizer, scheduler, train_dataset, val_dataset, solver_pr
     loc_losses = AverageMeter()
     cls_losses = AverageMeter()
 
-    # train_dataset = Detection(args, 'train', BaseTransform(args.input_dim, args.means, args.stds))
+    # train_dataset = DetectionDatasetDatasetDatasetDatasetDataset(args, 'train', BaseTransform(args.input_dim, args.means, args.stds))
 
     log_file.write(train_dataset.print_str)
     log_file.write(val_dataset.print_str)
