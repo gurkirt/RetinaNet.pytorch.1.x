@@ -305,10 +305,10 @@ def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFil
     
     resFile_txt.write(ptr_str)
     # pdb.set_trace()
-
+    eval_strings = utils.eval_strings()
     ptr_str = ''
-    for s in cocoEval.stats:
-        ptr_str += str(s) + '\n'
+    for sid, val in enumerate(cocoEval.stats):
+        ptr_str += eval_strings[sid] + str(val) + '\n'
     print('\n\nPrintning COCOeval Generated results\n\n ')
     print(ptr_str)
     resFile_txt.write(ptr_str)

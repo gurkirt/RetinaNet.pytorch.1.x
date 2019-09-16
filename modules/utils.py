@@ -80,6 +80,7 @@ def create_exp_name(args):
                                             args.min_size, args.max_size, int(args.multi_scale), args.dataset, args.basenet,
                                             args.num_head_layers, args.shared_heads, int(args.fbn), args.freezeupto, int(args.use_bias),
                                             args.batch_size, args.optim, int(args.lr * 1000000), args.loss_type)
+
 # Freeze batch normlisation layers
 def set_bn_eval(m):
     classname = m.__class__.__name__
@@ -88,3 +89,18 @@ def set_bn_eval(m):
         if m.affine:
             m.weight.requires_grad = False
             m.bias.requires_grad = False
+        
+
+def eval_strings():
+    return ["Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = ",
+            "Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = ",
+            "Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = ",    
+            "Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = ",
+            "Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = ",
+            "Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = ",
+            "Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = ",
+            "Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = ",
+            "Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = ",
+            "Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = ",
+            "Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = ",
+            "Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = "]
