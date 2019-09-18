@@ -436,7 +436,7 @@ def validate(args, net,  val_data_loader, val_dataset, iteration_num, iou_thresh
                     # pdb.set_trace()
                     scores = conf_scores[:, cl_ind].squeeze()
                     if args.loss_type == 'yolo':
-                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze()
+                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze() * 5.0
                     c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
                     scores = scores[c_mask].squeeze()
                     # print('scores size',c_mask.sum())

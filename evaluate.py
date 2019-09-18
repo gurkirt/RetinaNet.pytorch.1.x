@@ -71,7 +71,7 @@ parser.add_argument('--freezeupto', default=1, type=int, help='if 0 freeze or el
 # Evaluation hyperparameters
 parser.add_argument('--iou_thresh', default=0.5, type=float, help='Evaluation threshold')
 parser.add_argument('--conf_thresh', default=0.05, type=float, help='Confidence threshold for evaluation')
-parser.add_argument('--nms_thresh', default=0.45, type=float, help='NMS threshold')
+parser.add_argument('--nms_thresh', default=0.5, type=float, help='NMS threshold')
 parser.add_argument('--topk', default=100, type=int, help='topk for evaluation')
 
 # Progress logging
@@ -230,7 +230,7 @@ def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFil
                     # pdb.set_trace()
                     scores = conf_scores[:, cl_ind].squeeze()
                     if args.loss_type == 'yolo':
-                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze()
+                        scores = conf_scores[:, cl_ind].squeeze() * conf_scores[:, 0].squeeze() * 5.0
                     # scoresth, _ = torch.sort(scores, descending=True)
                     c_mask = scores.gt(args.conf_thresh)  # greater than minmum threshold
                     # c_mask = scores.gt(min(max(max_scoresth, args.conf_thresh), min_scoresth))  # greater than minmum threshold
@@ -244,7 +244,7 @@ def validate_coco(args, net, val_data_loader, val_dataset, iteration_num, resFil
                     l_mask = c_mask.unsqueeze(1).expand_as(boxes)
                     boxes = boxes[l_mask].view(-1, 4)
                     # idx of highest scoring and non-overlapping boxes per class
-                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*20)  # idsn - ids after nms
+                    ids, counts = nms(boxes, scores, args.nms_thresh, args.topk*10)  # idsn - ids after nms
                     scores = scores[ids[:counts]].cpu().numpy()
                     pick = min(scores.shape[0], args.topk)
                     scores = scores[:pick]
